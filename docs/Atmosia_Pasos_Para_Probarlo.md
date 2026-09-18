@@ -36,11 +36,21 @@ Tiene que responder algo que empiece con 17.
 
 > **¿Ya tenés Java 21 u otra versión?**
 >
-> No alcanza, pero tampoco es un problema: hay que instalar la 17 igual. Las versiones de Java conviven sin pisarse, así que instalar la 17 no rompe nada de lo que ya tengas ni desinstala la 21.
+> No alcanza, y esto está comprobado, no supuesto: con Java 21 la compilación corta de entrada con el mensaje "Unsupported class file major version 65". Ni siquiera llega a leer el código del mod.
 >
-> El motivo es que Minecraft 1.20.1 y las herramientas que lo construyen están hechas para la 17. Con una versión más nueva la compilación suele fallar con errores que no dicen nada sobre la causa real, y se pierde más tiempo adivinando que instalando.
+> Hay que instalar la 17 igual. Las versiones de Java conviven sin pisarse: instalar la 17 no desinstala la 21 ni rompe nada de lo que ya tengas.
 >
 > La comprobación opcional del paso 10 sí funciona con Java 21, porque no usa Minecraft.
+
+### Si tenés las dos versiones instaladas
+
+Puede pasar que java -version siga respondiendo 21 después de instalar la 17. En ese caso hay que decirle explícitamente cuál usar. En Windows, cerrá la terminal, abrí una nueva y escribí esto antes de compilar, ajustando la ruta a donde quedó instalada la 17:
+
+```
+set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17
+```
+
+Para saber la ruta exacta, mirá dentro de C:\Program Files\Eclipse Adoptium: va a haber una carpeta que empieza con jdk-17. Ese ajuste dura mientras la terminal esté abierta, así que hay que repetirlo si la cerrás.
 
 ## 2. Bajar el proyecto
 
@@ -132,7 +142,17 @@ Es el escenario esperable y no requiere que entiendas el error. Lo que hace falt
 
 Con eso alcanza para diagnosticarlo. No hace falta que interpretes nada.
 
-## 10. Opcional: una comprobación sin Minecraft
+## 10. Errores conocidos y qué significan
+
+| Mensaje | Qué pasa |
+|---|---|
+| `gradlew.bat no se reconoce como un comando` | Faltan los archivos del wrapper en la carpeta. Volvé a descargar el ZIP del proyecto: faltaban en las primeras versiones y ya están agregados. |
+| `Unsupported class file major version 65` | Estás usando Java 21. Instalá la 17 y mirá el paso 1. |
+| `Unsupported class file major version 61 o similar` | Lo mismo pero al revés: la versión de Java es más vieja de lo esperado. |
+| `Could not resolve net.minecraftforge` | Problema de red, o la versión de Forge en gradle.properties no existe. Confirmala en files.minecraftforge.net para 1.20.1. |
+| `BUILD FAILED con errores que mencionan archivos .java` | Es lo esperable: errores del código del mod. Copiá el texto y mandalo, no hay nada que puedas hacer de tu lado. |
+
+## 11. Opcional: una comprobación sin Minecraft
 
 Si querés verificar algo sin esperar las descargas, hay una parte del mod que se puede probar sola: la matemática que genera las formas de las nubes. Desde la misma terminal, en la carpeta del proyecto, escribí estas dos líneas, una y después la otra:
 
