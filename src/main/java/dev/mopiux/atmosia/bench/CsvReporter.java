@@ -1,5 +1,6 @@
 package dev.mopiux.atmosia.bench;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -46,19 +47,61 @@ public final class CsvReporter {
         this.directory = directory;
     }
 
-    /** Agrega una fila de resumen, creando el archivo con encabezado si no existía. */
+    /**
+     * Agrega una fila de resumen, creando el archivo con encabezado si no existía.
+     *
+     * Si el archivo ya existe pero su encabezado es de una versión anterior del mod, se aparta con
+     * el nombre cambiado y se empieza uno nuevo. Agregar columnas nuevas debajo de un encabezado
+     * viejo produce un archivo donde cada valor cae en la columna equivocada: se sigue abriendo sin
+     * error y todo lo que se lea de él es mentira. Un archivo de mediciones que miente en silencio
+     * es peor que no tenerlo, y pasó de verdad: la tanda del 18/09 quedó corrida tres columnas.
+     */
     public Path appendSummary(String csvRow) throws IOException {
         Files.createDirectories(this.directory);
         Path file = this.directory.resolve("results.csv");
-        boolean isNew = !Files.exists(file);
+
+        boolean writeHeader = true;
+        if (Files.exists(file)) {
+            String existing = firstLine(file);
+            if (HEADER.equals(existing)) {
+                writeHeader = false;
+            } else {
+                Files.move(file, this.rotatedName(file));
+            }
+        }
+
         StringBuilder out = new StringBuilder();
-        if (isNew) {
+        if (writeHeader) {
             out.append(HEADER).append('\n');
         }
         out.append(csvRow).append('\n');
         Files.writeString(file, out.toString(), StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         return file;
+    }
+
+    /** Primera línea del archivo, o cadena vacía si está vacío o no se puede leer. */
+    private static String firstLine(Path file) {
+        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            String line = reader.readLine();
+            return line == null ? "" : line;
+        } catch (IOException e) {
+            // No se pudo leer: se trata como encabezado distinto y el archivo se aparta. Prefiere
+            // un archivo de más a arriesgar filas corridas en el que ya está.
+            return "";
+        }
+    }
+
+    /** Nombre libre para apartar el archivo viejo, sin pisar uno apartado antes. */
+    private Path rotatedName(Path file) {
+        String stamp = LocalDateTime.now().format(STAMP);
+        Path candidate = this.directory.resolve("results-anterior-" + stamp + ".csv");
+        int suffix = 2;
+        while (Files.exists(candidate)) {
+            candidate = this.directory.resolve("results-anterior-" + stamp + "-" + suffix + ".csv");
+            suffix++;
+        }
+        return candidate;
     }
 
     /** Vuelca los tiempos frame a frame de una corrida. */

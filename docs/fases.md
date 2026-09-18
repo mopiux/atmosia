@@ -184,6 +184,59 @@ El CSV del benchmark gana tres columnas —`cloud_mode`, `quality_profile`, `cov
 sin ellas dos corridas del mismo escenario dejan de ser comparables y no hay forma de notarlo
 después.
 
+## Tercera prueba real (2026-09-18, 16:40)
+
+**La supresión de vanilla funciona.** `cloud_status=off` en las cuatro corridas. Es la primera tanda
+que mide Atmosia sola, sin las nubes del juego dibujándose encima, y la primera comparable consigo
+misma.
+
+**El temporizador de GPU quedó arreglado.** La racha máxima de valores idénticos bajó de 1263 frames
+(72% de la corrida) a 1 o 2 frames. Las cifras de GPU vuelven a valer.
+
+Perfil Medio, cantidad 120%, render distance 16, 1920×991:
+
+| Escenario | FPS medio | 1% low | CPU mediana | GPU mediana | GPU p95 |
+|---|---|---|---|---|---|
+| `fast_travel` | 69,2 | 11,9 | 11,96 ms | 2,69 ms | 10,21 ms |
+| `altitude_sweep` | 66,5 | 16,1 | 13,57 ms | 1,77 ms | 9,36 ms |
+| `full_coverage` | 34,0 | 18,2 | 28,61 ms | 16,11 ms | 23,68 ms |
+| `camera_spin` | 30,2 | 13,6 | 32,27 ms | 12,59 ms | 22,53 ms |
+
+Tres hallazgos, en orden de importancia:
+
+1. **Hay dos regímenes de costo distintos.** `fast_travel` y `altitude_sweep` tienen una distribución
+   de GPU bimodal: mediana de 1,8–2,7 ms, pero entre el 18% y el 24% de los frames cuestan 7–9 ms.
+   `full_coverage` y `camera_spin` no tienen un solo frame por encima del doble de su mediana. En
+   movimiento el costo son los picos de subida de geometría; con el cielo lleno es relleno sostenido.
+   Son dos problemas y se arreglan distinto.
+2. **`camera_spin` está limitado por CPU, no por GPU**, y por 2,5 a 1 (32,27 ms contra 12,59). Eso
+   contradice la expectativa de la Fase 0, que apuntaba al fill rate como cuello probable. El dato
+   tiene una salvedad grande: el `cpu_ms` medido es el del frame completo, y girar la cámara también
+   obliga a Minecraft a rehacer su culling de chunks.
+3. **Los 1% low siguen siendo el problema real.** En `fast_travel`, media de 69 FPS y 1% low de 11,9:
+   casi 6 a 1. El frame más lento fue de 166 ms. El sospechoso está identificado —`region_gen_ms`
+   llegó a 1,26 ms y la construcción de malla corre en el hilo de render— pero no confirmado.
+
+Sigue faltando la línea base de vanilla, que es lo que permitiría separar el costo de Atmosia del de
+Minecraft en el punto 2. Se mide poniendo el modo de nubes en `Vanilla` y repitiendo los cuatro
+escenarios.
+
+### Un error que encontraron estos mismos datos
+
+El `results.csv` de esta tanda quedó **corrido tres columnas**. Las columnas nuevas (`cloud_mode`,
+`quality_profile`, `coverage_scale`) se agregaron debajo del encabezado viejo, porque el archivo ya
+existía y el encabezado solo se escribía al crearlo. El archivo se abre sin error y todo lo que se
+lea de él es mentira.
+
+Un archivo de mediciones que miente en silencio es peor que no tenerlo. Corregido: si el encabezado
+del archivo existente no coincide con el actual, el viejo se aparta como `results-anterior-<fecha>.csv`
+y se empieza uno nuevo. No se pierde nada y ninguno de los dos queda inconsistente.
+
+### Documentación
+
+`docs/sistema-de-nubes.md` explica el sistema completo de generación —del ruido al dibujo— con sus
+ventajas y sus costos, y con estas mediciones interpretadas.
+
 ## Limitaciones conocidas
 
 - **Orden de blending dentro de una región.** Los slices se hornean de abajo hacia arriba en un

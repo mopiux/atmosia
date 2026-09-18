@@ -24,6 +24,7 @@ Lo que falta es un entorno con Minecraft: compilar, corregir lo que salte, y med
 |---|---|
 | `docs/Atmosia_Documento_de_Diseno_v1.1.docx` | La especificación del proyecto. Es la versión vigente: hay que leer esta. |
 | `docs/Atmosia_Documento_de_Diseno_v1.0.docx` | El original, conservado solo como referencia histórica. |
+| `docs/sistema-de-nubes.md` | **Cómo funciona el sistema de nubes que está andando hoy**, del ruido al dibujo, con sus ventajas y sus costos medidos. |
 | `docs/fase-0-analisis-y-arquitectura.md` | La respuesta a lo que pide el documento: arquitectura propuesta, decisiones con sus alternativas, riesgos y verificaciones pendientes. |
 | `docs/Atmosia_Pasos_Para_Probarlo.docx` (y `.md`) | **Si nunca compilaste nada, empezá por acá.** Paso a paso, desde instalar Java. |
 | `docs/guia-de-prueba.md` (y su versión `.docx`) | La guía técnica: qué decidir, cómo leer el CSV, qué reportar. |
