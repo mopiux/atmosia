@@ -54,15 +54,24 @@ public final class GpuTimer {
         this.queryOpen = true;
     }
 
-    /** Cierra la consulta del frame actual y cosecha la más vieja que ya esté disponible. */
+    /**
+     * Cierra la consulta del frame actual y cosecha la más vieja que ya esté disponible.
+     *
+     * La cosecha ocurre siempre, haya o no consulta abierta. Cuando no era así, un anillo lleno
+     * dejaba el temporizador colgado para siempre: no se abría consulta, y sin consulta abierta
+     * tampoco se cosechaba, así que el anillo nunca se vaciaba. La primera medición real lo
+     * delató — el mismo valor de GPU repetido durante 1263 frames seguidos.
+     */
     public void endFrame() {
-        if (!this.available || !this.queryOpen) {
+        if (!this.available) {
             return;
         }
-        GL33.glEndQuery(GL33.GL_TIME_ELAPSED);
-        this.queryOpen = false;
-        this.pending[this.writeIndex] = true;
-        this.writeIndex = (this.writeIndex + 1) % RING_SIZE;
+        if (this.queryOpen) {
+            GL33.glEndQuery(GL33.GL_TIME_ELAPSED);
+            this.queryOpen = false;
+            this.pending[this.writeIndex] = true;
+            this.writeIndex = (this.writeIndex + 1) % RING_SIZE;
+        }
         this.harvest();
     }
 

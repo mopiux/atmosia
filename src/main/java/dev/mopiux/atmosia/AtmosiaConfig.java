@@ -56,7 +56,7 @@ public final class AtmosiaConfig {
                              "hasta dónde llegan las nubes. No es una distancia fija a propósito:",
                              "generar nubes mucho más lejos de lo que el mundo dibuja es trabajo",
                              "tirado, y quedarse corto se ve peor que no tener nubes.")
-                    .defineInRange("distanceMultiplier", 1.5D, 0.5D, 6.0D);
+                    .defineInRange("distanceMultiplier", 3.0D, 0.5D, 8.0D);
 
             this.coverageScale = builder
                     .comment("Multiplicador de cobertura. Mayor a 1 agranda las formaciones.",
@@ -80,7 +80,7 @@ public final class AtmosiaConfig {
 
             this.maxCachedRegions = builder
                     .comment("Regiones vivas en caché. Más es más memoria y menos regeneración.")
-                    .defineInRange("maxCachedRegions", 192, 16, 2048);
+                    .defineInRange("maxCachedRegions", 384, 16, 2048);
 
             this.generationThreads = builder
                     .comment("Hilos de generación de densidad. 0 usa la mitad de los núcleos.")

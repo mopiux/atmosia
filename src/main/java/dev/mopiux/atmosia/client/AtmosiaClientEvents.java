@@ -36,9 +36,10 @@ public final class AtmosiaClientEvents {
         if (mc.level == null) {
             return;
         }
-        // Respetar el ajuste del juego: si el jugador apagó las nubes, no se dibuja nada.
-        if (mc.options.getCloudsType() == net.minecraft.client.CloudStatus.OFF
-                && !VanillaCloudSuppressor.strategy().equals("clouds-option-off")) {
+        // Respetar el ajuste del juego: si el jugador ya tenía las nubes apagadas, no se dibuja.
+        // El supresor guarda el valor original, así que esto distingue "el jugador no quiere nubes"
+        // de "las apagamos nosotros para dibujar las nuestras".
+        if (VanillaCloudSuppressor.playerWantsNoClouds()) {
             return;
         }
 

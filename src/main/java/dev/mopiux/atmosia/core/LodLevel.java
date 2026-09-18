@@ -14,10 +14,13 @@ package dev.mopiux.atmosia.core;
 public enum LodLevel {
 
     HIGH(8, 16, 3),
-    MEDIUM(4, 32, 3),
-    LOW(2, 64, 2),
-    MINIMAL(1, 128, 1);
+    MEDIUM(4, 16, 3),
+    LOW(2, 32, 2),
+    MINIMAL(1, 64, 1);
 
+    // La celda no crece tanto como el ahorro tentaría: una celda de 128 bloques se ve como una
+    // sábana rectangular en el cielo, no como una nube, por lejos que esté. El ahorro a distancia
+    // sale de los slices, que es donde está el costo de relleno.
     private final int slices;
     private final int cellSize;
     private final int layers;

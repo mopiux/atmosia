@@ -149,17 +149,24 @@ public final class CoreSmokeTest {
         }
         check("detalle nunca sube con la distancia", monotonic, previous);
 
-        // Por debajo de cierto render distance manda el piso de 256 bloques, así que la
-        // proporcionalidad solo vale por encima de ese piso. Un domo de nubes minúsculo se ve peor
-        // que uno generoso, y 256 bloques de nubes con 128 de terreno sigue siendo razonable.
-        double rd8 = LodSelector.forRenderDistance(8, 1.5).maxDistance();
-        double rd16 = LodSelector.forRenderDistance(16, 1.5).maxDistance();
-        double rd32 = LodSelector.forRenderDistance(32, 1.5).maxDistance();
-        check("distancia escala con render distance", rd32 > rd16 && rd16 > rd8, rd8 + " / " + rd16 + " / " + rd32);
-        check("proporcional por encima del piso", Math.abs(rd32 - rd16 * 2.0) < 1e-9, rd16 + " -> " + rd32);
+        // Por debajo de cierto render distance manda el piso, así que la proporcionalidad solo vale
+        // por encima de él. El piso es generoso a propósito: la primera prueba real mostró que un
+        // domo corto se ve recortado dentro del campo de visión, y eso se nota mucho más que el
+        // costo de unas regiones de más.
+        check("piso de 512 con render distance bajo",
+                Math.abs(LodSelector.forRenderDistance(4, 1.5).maxDistance() - 512.0) < 1e-9,
+                LodSelector.forRenderDistance(4, 1.5).maxDistance());
+
+        double rd24 = LodSelector.forRenderDistance(24, 1.5).maxDistance();
+        double rd48 = LodSelector.forRenderDistance(48, 1.5).maxDistance();
+        check("distancia escala con render distance", rd48 > rd24, rd24 + " -> " + rd48);
+        check("proporcional por encima del piso", Math.abs(rd48 - rd24 * 2.0) < 1e-9, rd24 + " -> " + rd48);
         check("el multiplicador se aplica",
-                Math.abs(LodSelector.forRenderDistance(32, 2.0).maxDistance() - 1024.0) < 1e-9,
-                LodSelector.forRenderDistance(32, 2.0).maxDistance());
+                Math.abs(LodSelector.forRenderDistance(32, 3.0).maxDistance() - 1536.0) < 1e-9,
+                LodSelector.forRenderDistance(32, 3.0).maxDistance());
+
+        // Con el domo por defecto, ninguna celda llega a verse como una sábana en el cielo.
+        check("celda maxima acotada", LodLevel.MINIMAL.cellSize() <= 64, LodLevel.MINIMAL.cellSize());
         check("piso minimo con render distance bajo",
                 LodSelector.forRenderDistance(2, 1.0).maxDistance() >= 256.0,
                 LodSelector.forRenderDistance(2, 1.0).maxDistance());

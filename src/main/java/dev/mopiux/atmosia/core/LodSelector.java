@@ -30,7 +30,9 @@ public final class LodSelector {
      */
     public static LodSelector forRenderDistance(int renderDistanceChunks, double multiplier) {
         double worldDistance = renderDistanceChunks * 16.0D;
-        double max = Math.max(256.0D, worldDistance * multiplier);
+        // El piso es generoso a propósito: un domo de nubes corto se nota muchísimo más que uno
+        // largo, porque el borde queda dentro del campo de visión y el cielo se ve recortado.
+        double max = Math.max(512.0D, worldDistance * multiplier);
         // Las proporciones replican los tramos del documento (300/800/1500 sobre 1500).
         return new LodSelector(max * 0.20D, max * 0.53D, max, max);
     }

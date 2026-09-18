@@ -36,15 +36,15 @@ public record CloudLayerDef(
      * mira hacia arriba un rato (Sección 10).
      */
     public static final CloudLayerDef HIGH =
-            new CloudLayerDef("high", 216.0D, 14.0D, 0.92F, 0.94F, 1.00F, 1.6D, 0.4D, 0.34D, 620.0D);
+            new CloudLayerDef("high", 216.0D, 14.0D, 0.92F, 0.94F, 1.00F, 1.6D, 0.4D, 0.26D, 620.0D);
 
     /** Capa media: densidad intermedia, gris neutro. */
     public static final CloudLayerDef MID =
-            new CloudLayerDef("mid", 192.0D, 20.0D, 0.96F, 0.96F, 0.97F, 1.0D, 0.25D, 0.46D, 420.0D);
+            new CloudLayerDef("mid", 192.0D, 20.0D, 0.96F, 0.96F, 0.97F, 1.0D, 0.25D, 0.36D, 420.0D);
 
     /** Capa baja: mayor cobertura, gris apenas más oscuro, la más lenta. */
     public static final CloudLayerDef LOW =
-            new CloudLayerDef("low", 172.0D, 16.0D, 0.88F, 0.89F, 0.92F, 0.6D, 0.15D, 0.52D, 300.0D);
+            new CloudLayerDef("low", 172.0D, 16.0D, 0.88F, 0.89F, 0.92F, 0.6D, 0.15D, 0.42D, 300.0D);
 
     public static final CloudLayerDef[] DEFAULTS = { LOW, MID, HIGH };
 

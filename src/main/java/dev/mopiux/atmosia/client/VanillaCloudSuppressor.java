@@ -1,10 +1,8 @@
 package dev.mopiux.atmosia.client;
 
-import java.lang.reflect.Field;
-import java.util.Map;
+import javax.annotation.Nullable;
+import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.DimensionSpecialEffects;
-import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,160 +10,87 @@ import org.slf4j.LoggerFactory;
  * Suprime las nubes vanilla sin mixin (Sección 13.1 del documento de diseño).
  *
  * El riesgo principal del proyecto no es de rendimiento sino de compatibilidad: cualquier hook
- * sobre LevelRenderer choca con shader packs y mods de optimización. Por eso se intenta primero la
- * vía que no toca LevelRenderer en absoluto.
+ * sobre LevelRenderer choca con shader packs y mods de optimización. Esta vía no toca LevelRenderer
+ * ni comparte punto de inyección con nadie: apaga el ajuste de nubes del propio juego mientras
+ * Atmosia dibuja, y lo devuelve como estaba al desactivarse.
  *
- * Dos estrategias, en orden:
+ * <h2>Por qué no se usa la ruta de efectos de dimensión</h2>
  *
- * 1. Sustituir los efectos de dimensión del Overworld por una versión que declara una altura de
- *    nubes inválida, que es el mecanismo por el cual el Nether y el End no dibujan nubes. No hay
- *    mixin, no hay punto de inyección compartido y por lo tanto no hay conflicto con nadie.
+ * La primera versión intentaba sustituir los efectos del Overworld por unos que declaran una altura
+ * de nubes inválida, que es como el Nether y el End no dibujan nubes. En la primera prueba real no
+ * funcionó: las nubes vanilla siguieron dibujándose junto a las de Atmosia, con el ajuste del juego
+ * todavía en "fancy".
  *
- * 2. Si eso falla, forzar el ajuste de nubes del juego a OFF mientras Atmosia esté activo, y
- *    restaurarlo al desactivarse. Es más tosco porque toca una opción que el jugador ve, pero
- *    también es imposible que entre en conflicto con otro mod.
+ * La explicación más probable es que ClientLevel resuelve su DimensionSpecialEffects una sola vez,
+ * al construirse, y se queda con esa instancia. Sustituir la entrada del mapa después de que el
+ * mundo ya existe no cambia nada, y Atmosia se entera del mundo justo después de que carga. Podría
+ * funcionar sustituyendo la entrada antes de que se cree cualquier nivel, pero eso obliga a pisar
+ * un recurso global compartido con otros mods desde el arranque — exactamente la clase de conflicto
+ * que este proyecto decidió evitar.
  *
- * HIPÓTESIS SIN VERIFICAR: que una altura inválida suprima el render vanilla en 1.20.1 está
- * tomado del comportamiento conocido de las dimensiones sin nubes, no de haber leído el código.
- * Es la Verificación 1 de la Fase 0 y hay que confirmarla. Si no se cumple, la estrategia 2 actúa
- * de red y el mod funciona igual.
+ * El ajuste de nubes es más tosco porque el jugador lo ve cambiado en el menú, y a cambio es
+ * imposible que entre en conflicto con otro mod.
  */
 public final class VanillaCloudSuppressor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("atmosia");
-    private static final ResourceLocation OVERWORLD_EFFECTS = new ResourceLocation("minecraft", "overworld");
 
-    private static boolean attempted;
-    private static boolean effectsReplaced;
-    private static boolean forcedCloudsOff;
+    @Nullable
+    private static CloudStatus savedStatus;
+    private static boolean installed;
 
     private VanillaCloudSuppressor() {
     }
 
     public static boolean isActive() {
-        return effectsReplaced || forcedCloudsOff;
+        return installed;
     }
 
-    /** Estrategia aplicada, para el log y para las métricas. */
     public static String strategy() {
-        if (effectsReplaced) {
-            return "dimension-effects";
-        }
-        return forcedCloudsOff ? "clouds-option-off" : "none";
-    }
-
-    public static void install() {
-        if (attempted) {
-            return;
-        }
-        attempted = true;
-
-        if (replaceOverworldEffects()) {
-            effectsReplaced = true;
-            LOGGER.info("Nubes vanilla suprimidas por efectos de dimensión, sin mixin.");
-            return;
-        }
-
-        forceCloudsOff();
+        return installed ? "clouds-option-off" : "none";
     }
 
     /**
-     * Sustituye la entrada del Overworld en la tabla de efectos de dimensión.
+     * Si el jugador tenía las nubes apagadas antes de que Atmosia tocara nada.
      *
-     * VERIFICAR: el nombre y el tipo del campo estático que guarda esa tabla en 1.20.1. Se busca
-     * por tipo y no por nombre justamente porque el nombre depende de los mappings.
+     * Es un ajuste que el jugador ya conoce y que significa "no quiero nubes". Atmosia lo respeta y
+     * no dibuja: reemplazar las nubes vanilla no incluye el derecho a ignorar esa decisión.
      */
-    private static boolean replaceOverworldEffects() {
-        try {
-            Map<ResourceLocation, DimensionSpecialEffects> effects = findEffectsTable();
-            if (effects == null) {
-                LOGGER.warn("No se encontró la tabla de efectos de dimensión.");
-                return false;
-            }
-            DimensionSpecialEffects original = effects.get(OVERWORLD_EFFECTS);
-            if (original == null) {
-                LOGGER.warn("La tabla de efectos no tiene entrada para el Overworld.");
-                return false;
-            }
-            if (!(original instanceof DimensionSpecialEffects.OverworldEffects)) {
-                // Otro mod ya la reemplazó. Se respeta y no se pisa: pisarla en silencio es
-                // exactamente el tipo de conflicto que este proyecto quiere evitar.
-                LOGGER.info("Otro mod ya definió los efectos del Overworld ({}). Atmosia no los toca.",
-                        original.getClass().getName());
-                return false;
-            }
-            effects.put(OVERWORLD_EFFECTS, new CloudlessOverworldEffects());
+    public static boolean playerWantsNoClouds() {
+        Minecraft mc = Minecraft.getInstance();
+        CloudStatus effective = installed ? savedStatus : mc.options.getCloudsType();
+        return effective == CloudStatus.OFF;
+    }
+
+    /** Apaga las nubes vanilla. Devuelve false si el jugador ya las tenía apagadas. */
+    public static boolean install() {
+        if (installed) {
             return true;
-        } catch (RuntimeException | LinkageError e) {
-            LOGGER.warn("No se pudieron sustituir los efectos de dimensión: {}", e.toString());
+        }
+        Minecraft mc = Minecraft.getInstance();
+        CloudStatus current = mc.options.getCloudsType();
+        if (current == CloudStatus.OFF) {
+            LOGGER.info("El jugador tiene las nubes en OFF. Atmosia respeta el ajuste y no dibuja.");
             return false;
         }
+        savedStatus = current;
+        mc.options.cloudStatus().set(CloudStatus.OFF);
+        mc.options.save();
+        installed = true;
+        LOGGER.info("Nubes vanilla suprimidas (ajuste del juego: {} -> OFF).", current);
+        return true;
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<ResourceLocation, DimensionSpecialEffects> findEffectsTable() {
-        for (Field field : DimensionSpecialEffects.class.getDeclaredFields()) {
-            if (!Map.class.isAssignableFrom(field.getType())) {
-                continue;
-            }
-            try {
-                field.setAccessible(true);
-                Object value = field.get(null);
-                if (value instanceof Map<?, ?> map && !map.isEmpty()) {
-                    Object sample = map.keySet().iterator().next();
-                    if (sample instanceof ResourceLocation) {
-                        return (Map<ResourceLocation, DimensionSpecialEffects>) map;
-                    }
-                }
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-                // Se sigue buscando: puede haber más de un campo de tipo Map.
-            }
-        }
-        return null;
-    }
-
-    /** Red de seguridad: apaga el ajuste de nubes del juego. */
-    private static void forceCloudsOff() {
-        Minecraft mc = Minecraft.getInstance();
-        try {
-            if (mc.options.getCloudsType() != net.minecraft.client.CloudStatus.OFF) {
-                mc.options.cloudStatus().set(net.minecraft.client.CloudStatus.OFF);
-                mc.options.save();
-                forcedCloudsOff = true;
-                LOGGER.info("Nubes vanilla suprimidas apagando el ajuste de nubes del juego.");
-            } else {
-                LOGGER.info("El jugador ya tenía las nubes en OFF.");
-            }
-        } catch (RuntimeException e) {
-            LOGGER.error("No se pudieron suprimir las nubes vanilla: {}", e.toString());
-        }
-    }
-
-    /** Devuelve las cosas como estaban. */
+    /** Devuelve el ajuste del jugador como estaba. */
     public static void uninstall() {
-        if (forcedCloudsOff) {
-            Minecraft mc = Minecraft.getInstance();
-            mc.options.cloudStatus().set(net.minecraft.client.CloudStatus.FANCY);
-            mc.options.save();
-            forcedCloudsOff = false;
+        if (!installed) {
+            return;
         }
-        // La tabla de efectos de dimensión no se restaura: hacerlo a mitad de partida deja al
-        // renderer vanilla dibujando sobre las nubes propias durante un frame. Se restaura solo al
-        // cerrar el juego, que es cuando la tabla se reconstruye igual.
-        attempted = false;
-    }
-
-    /**
-     * Efectos del Overworld sin nubes.
-     *
-     * VERIFICAR: que Float.NaN sea efectivamente el valor que indica "esta dimensión no tiene
-     * nubes" en 1.20.1. Es la hipótesis central de la vía sin mixin.
-     */
-    private static final class CloudlessOverworldEffects extends DimensionSpecialEffects.OverworldEffects {
-
-        @Override
-        public float getCloudHeight() {
-            return Float.NaN;
-        }
+        Minecraft mc = Minecraft.getInstance();
+        mc.options.cloudStatus().set(savedStatus != null ? savedStatus : CloudStatus.FANCY);
+        mc.options.save();
+        LOGGER.info("Nubes vanilla restauradas ({}).", savedStatus);
+        savedStatus = null;
+        installed = false;
     }
 }

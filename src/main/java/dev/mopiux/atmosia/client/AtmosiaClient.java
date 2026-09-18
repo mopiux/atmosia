@@ -51,10 +51,14 @@ public final class AtmosiaClient {
             return;
         }
         if (renderer == null) {
+            if (!VanillaCloudSuppressor.install()) {
+                // El jugador tiene las nubes apagadas. No se activa nada: ni las vanilla ni las
+                // propias, que es lo que ese ajuste significa.
+                return;
+            }
             long seed = resolveSeed(level);
             renderer = new CloudRenderer(seed);
             CloudMetricsProvider.Registry.set(renderer);
-            VanillaCloudSuppressor.install();
             LOGGER.info("Atmosia activo. Seed {}, supresión de vanilla: {}",
                     seed, VanillaCloudSuppressor.strategy());
         }
