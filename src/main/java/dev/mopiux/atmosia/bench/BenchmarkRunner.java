@@ -1,5 +1,6 @@
 package dev.mopiux.atmosia.bench;
 
+import dev.mopiux.atmosia.AtmosiaConfig;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -250,6 +251,9 @@ public final class BenchmarkRunner {
                 this.scenario.id(),
                 renderer,
                 this.scenario.coverage().name().toLowerCase(Locale.ROOT),
+                AtmosiaConfig.CLIENT.cloudMode.get().name().toLowerCase(Locale.ROOT),
+                AtmosiaConfig.CLIENT.qualityProfile.get().name().toLowerCase(Locale.ROOT),
+                CsvReporter.num(AtmosiaConfig.CLIENT.coverageScale.get()),
                 CsvReporter.num(this.durationSeconds),
                 Integer.toString(this.cpuStats.count()),
                 CsvReporter.num(this.cpuStats.meanFps()),

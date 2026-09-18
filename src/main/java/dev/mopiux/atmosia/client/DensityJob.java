@@ -20,12 +20,23 @@ public final class DensityJob {
     private final CloudLayerDef layer;
     private final LodLevel lod;
     private final NoiseField noise;
+    private final double coverageScale;
 
     public DensityJob(RegionKey key, CloudLayerDef layer, LodLevel lod, NoiseField noise) {
+        this(key, layer, lod, noise, 1.0D);
+    }
+
+    public DensityJob(RegionKey key, CloudLayerDef layer, LodLevel lod, NoiseField noise,
+                      double coverageScale) {
         this.key = key;
         this.layer = layer;
         this.lod = lod;
         this.noise = noise;
+        this.coverageScale = coverageScale;
+    }
+
+    public double coverageScale() {
+        return this.coverageScale;
     }
 
     public RegionKey key() {
@@ -50,7 +61,7 @@ public final class DensityJob {
     public Result compute() {
         int cells = this.lod.cellsPerSide(RegionKey.REGION_SIZE);
         float[] density = new float[cells * cells];
-        DensityField field = new DensityField(this.noise, this.layer);
+        DensityField field = new DensityField(this.noise, this.layer, this.coverageScale);
 
         double originX = this.key.originX();
         double originZ = this.key.originZ();

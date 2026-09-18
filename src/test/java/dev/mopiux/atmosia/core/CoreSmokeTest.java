@@ -35,9 +35,124 @@ public final class CoreSmokeTest {
         priority();
         budget();
         regions();
+        profiles();
+        coverage();
+        modes();
 
         System.out.println(fails == 0 ? "\nTODO OK" : "\n" + fails + " FALLAS");
         System.exit(fails == 0 ? 0 : 1);
+    }
+
+    /** Perfiles gráficos: que los tres se ordenen y que el tope de detalle mande. */
+    static void profiles() {
+        QualityProfile.Settings low = QualityProfile.LOW.resolve(null);
+        QualityProfile.Settings mid = QualityProfile.MEDIUM.resolve(null);
+        QualityProfile.Settings high = QualityProfile.HIGH.resolve(null);
+
+        check("el domo crece de Bajo a Alto",
+                low.distanceMultiplier() < mid.distanceMultiplier()
+                        && mid.distanceMultiplier() < high.distanceMultiplier(),
+                low.distanceMultiplier() + " < " + mid.distanceMultiplier() + " < " + high.distanceMultiplier());
+        check("el presupuesto crece de Bajo a Alto",
+                low.quadsPerFrame() < mid.quadsPerFrame() && mid.quadsPerFrame() < high.quadsPerFrame(), "");
+        check("la cache crece de Bajo a Alto",
+                low.maxCachedRegions() < mid.maxCachedRegions()
+                        && mid.maxCachedRegions() < high.maxCachedRegions(), "");
+        check("Bajo recorta cortes por capa",
+                low.detailCap().slices() < mid.detailCap().slices(),
+                low.detailCap().slices() + " vs " + mid.detailCap().slices());
+        check("ningun perfil agranda la celda",
+                low.detailCap().cellSize() == mid.detailCap().cellSize(), low.detailCap().cellSize());
+
+        QualityProfile.Settings fromFile =
+                new QualityProfile.Settings(7.0D, LodLevel.LOW, 9, 99_999, 77);
+        check("CUSTOM deja mandar al archivo",
+                QualityProfile.CUSTOM.resolve(fromFile) == fromFile, "");
+        check("los perfiles fijos ignoran el archivo",
+                QualityProfile.MEDIUM.resolve(fromFile) != fromFile, "");
+        check("solo CUSTOM usa el archivo",
+                QualityProfile.CUSTOM.usesConfigValues() && !QualityProfile.LOW.usesConfigValues(), "");
+
+        // El tope de detalle es lo que convierte un perfil en ahorro real de relleno.
+        LodSelector capped = LodSelector.fixed(1000.0D, LodLevel.MEDIUM);
+        LodSelector open = LodSelector.fixed(1000.0D, LodLevel.HIGH);
+        check("el tope recorta el nivel mas fino",
+                capped.levelFor(10.0D) == LodLevel.MEDIUM && open.levelFor(10.0D) == LodLevel.HIGH,
+                capped.levelFor(10.0D));
+        check("el tope no sube el nivel a lo lejos",
+                capped.levelFor(999.0D) == open.levelFor(999.0D), capped.levelFor(999.0D));
+        check("fuera de rango sigue siendo nulo con tope",
+                capped.levelFor(1001.0D) == null, capped.levelFor(1001.0D));
+        check("sin tope explicito no se recorta nada",
+                LodSelector.fixed(1000.0D).levelFor(10.0D) == LodLevel.HIGH, "");
+    }
+
+    /** Cantidad de nubes: que el multiplicador llegue a la densidad y no se desborde. */
+    static void coverage() {
+        NoiseField noise = new NoiseField(99L);
+        CloudLayerDef layer = CloudLayerDef.MID;
+
+        DensityField plain = new DensityField(noise, layer);
+        DensityField more = new DensityField(noise, layer, 1.6D);
+        DensityField less = new DensityField(noise, layer, 0.4D);
+
+        check("sin multiplicador la capa queda como fue disenada",
+                plain.effectiveCoverage() == layer.coverage(), plain.effectiveCoverage());
+        check("mas cantidad es mas cobertura",
+                more.effectiveCoverage() > plain.effectiveCoverage()
+                        && plain.effectiveCoverage() > less.effectiveCoverage(),
+                more.effectiveCoverage() + " > " + plain.effectiveCoverage()
+                        + " > " + less.effectiveCoverage());
+        check("la cobertura nunca llega a tapar el cielo entero",
+                new DensityField(noise, layer, 100.0D).effectiveCoverage() < 1.0D,
+                new DensityField(noise, layer, 100.0D).effectiveCoverage());
+        check("la cobertura nunca se va abajo de cero",
+                new DensityField(noise, layer, 0.0D).effectiveCoverage() == 0.0D, "");
+
+        // Lo que de verdad importa: que a igual punto del cielo, mas cantidad no quite nube.
+        int denser = 0;
+        int sparser = 0;
+        for (int i = 0; i < 400; i++) {
+            double x = i * 137.0D;
+            double z = i * 311.0D;
+            double a = plain.densityAt(x, z);
+            double b = more.densityAt(x, z);
+            if (b > a) {
+                denser++;
+            }
+            if (b < a) {
+                sparser++;
+            }
+        }
+        check("subir la cantidad nunca quita nube en un punto", sparser == 0, sparser + " puntos");
+        check("y en muchos puntos agrega", denser > 40, denser + " de 400");
+
+        check("con cobertura cero el cielo queda despejado",
+                new DensityField(noise, layer, 0.0D).densityAt(500.0D, 700.0D) == 0.0D, "");
+    }
+
+    /** Los tres modos y lo que cada uno implica. */
+    static void modes() {
+        check("solo Atmosia dibuja",
+                CloudMode.ATMOSIA.drawsAtmosia() && !CloudMode.VANILLA.drawsAtmosia()
+                        && !CloudMode.NONE.drawsAtmosia(), "");
+        check("vanilla es el unico modo que no suprime",
+                !CloudMode.VANILLA.suppressesVanilla() && CloudMode.ATMOSIA.suppressesVanilla()
+                        && CloudMode.NONE.suppressesVanilla(), "");
+        check("NINGUNA suprime sin dibujar (es el modo de diagnostico)",
+                CloudMode.NONE.suppressesVanilla() && !CloudMode.NONE.drawsAtmosia(), "");
+
+        boolean named = true;
+        for (CloudMode m : CloudMode.values()) {
+            named &= !m.displayName().isBlank() && !m.description().isBlank();
+        }
+        check("todos los modos tienen nombre y explicacion", named, "");
+
+        boolean describedProfiles = true;
+        for (QualityProfile p : QualityProfile.values()) {
+            describedProfiles &= !p.displayName().isBlank() && !p.description().isBlank();
+        }
+        check("todos los perfiles tienen nombre y explicacion", describedProfiles, "");
     }
 
     static void noise() {

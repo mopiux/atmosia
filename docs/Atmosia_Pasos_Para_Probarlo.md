@@ -18,7 +18,7 @@ Calculá entre veinte minutos y una hora, casi todo esperando descargas. Necesit
 >
 > El código del mod nunca se pudo compilar mientras se escribía, porque el entorno donde se hizo no tenía acceso a los servidores de Minecraft ni de Forge. Es normal que aparezcan errores la primera vez.
 >
-> Si pasa, no hay nada que arreglar de tu lado: copiás el error y lo mandás. El paso 9 explica exactamente qué copiar.
+> Si pasa, no hay nada que arreglar de tu lado: copiás el error y lo mandás. El paso 10 explica exactamente qué copiar.
 
 ## 1. Instalar Java 17
 
@@ -40,7 +40,7 @@ Tiene que responder algo que empiece con 17.
 >
 > Hay que instalar la 17 igual. Las versiones de Java conviven sin pisarse: instalar la 17 no desinstala la 21 ni rompe nada de lo que ya tengas.
 >
-> La comprobación opcional del paso 10 sí funciona con Java 21, porque no usa Minecraft.
+> La comprobación opcional del paso 12 sí funciona con Java 21, porque no usa Minecraft.
 
 ### Si tenés las dos versiones instaladas
 
@@ -97,7 +97,7 @@ Este es el paso largo. Escribí el comando que corresponda a tu sistema:
 
 La primera vez descarga Minecraft, Forge y las herramientas de construcción: son varios minutos y van a aparecer muchas líneas de texto. Es normal. Dejalo trabajar aunque parezca trabado.
 
-Si termina con BUILD SUCCESSFUL, salió bien y podés seguir. Si termina con BUILD FAILED, andá directo al paso 9.
+Si termina con BUILD SUCCESSFUL, salió bien y podés seguir. Si termina con BUILD FAILED, andá directo al paso 10.
 
 ## 6. Abrir el juego de prueba
 
@@ -118,11 +118,39 @@ Se abre un Minecraft con el mod ya cargado. La primera vez también tarda. No te
 4. Crear el mundo y esperar a que cargue.
 5. Volar hacia arriba con doble salto y después la barra espaciadora, para ver bien el cielo.
 
-## 8. Qué mirar
+## 8. El menú del mod
+
+Antes de mirar el cielo conviene saber dónde está el interruptor, porque también es la herramienta de diagnóstico.
+
+1. Con el juego abierto, ir a **Mods** desde el menú principal, o `Esc` → `Mods` estando en el mundo.
+2. Elegir **Atmosia** en la lista de la izquierda.
+3. Apretar **Configuración**, abajo a la izquierda.
+
+Hay tres controles:
+
+**Nubes** — `Atmosia`, `Vanilla` o `Ninguna`.
+
+- `Atmosia`: las nubes del mod, con las del juego apagadas. Es lo normal.
+- `Vanilla`: las nubes originales de Minecraft, como si el mod no estuviera. Es el modo para medir la línea base del benchmark.
+- `Ninguna`: ni unas ni otras. El cielo tiene que quedar completamente vacío.
+
+**Calidad** — `Bajo`, `Medio` o `Alto`. Si el juego va lento, probá `Bajo`. Hay un cuarto, `Personalizado`, que usa los valores sueltos del archivo de configuración: no hace falta tocarlo.
+
+**Cantidad de nubes** — de 20% a 200%. Cuánto cielo tapan. Al soltarlo, el cielo se rehace, así que tarda uno o dos segundos en verse el cambio.
+
+Abajo hay un panel de estado que dice qué está pasando de verdad: en qué quedó el ajuste de nubes del juego, si Atmosia está dibujando y cuántas regiones tiene en memoria.
+
+> **La prueba decisiva de las nubes vanilla**
+>
+> Poné el modo en **Ninguna** y mirá el cielo. Tiene que quedar vacío, sin una sola nube.
+>
+> Si quedan nubes, son las de Minecraft y la supresión falló. Sacá una captura: eso es todo lo que hace falta para confirmarlo, y no hay otra forma de saberlo sin leer el log.
+
+## 9. Qué mirar
 
 Lo importante es lo visual. En orden de gravedad, de lo más grave a lo más fino:
 
-- Que no haya dos tipos de nubes a la vez. Si ves las nubes cuadradas de siempre por debajo de las nuevas, algo falló y es lo primero a reportar.
+- Que no haya dos tipos de nubes a la vez. Si ves las nubes cuadradas de siempre por debajo de las nuevas, algo falló y es lo primero a reportar. Confirmalo con la prueba del modo **Ninguna** del paso anterior.
 - Que haya nubes. Si el cielo quedó completamente vacío, también es un problema.
 - Que no parezcan tres planos transparentes separados: donde las capas se cruzan debería verse una masa más densa.
 - Que al alejarte no aparezcan agujeros ni cambios bruscos.
@@ -131,7 +159,7 @@ Lo importante es lo visual. En orden de gravedad, de lo más grave a lo más fin
 
 Sacá capturas de pantalla de lo que veas, esté bien o mal. Una imagen dice más que cualquier descripción, y nadie vio todavía cómo se ve esto.
 
-## 9. Si algo falla
+## 10. Si algo falla
 
 Es el escenario esperable y no requiere que entiendas el error. Lo que hace falta es el texto completo:
 
@@ -142,7 +170,7 @@ Es el escenario esperable y no requiere que entiendas el error. Lo que hace falt
 
 Con eso alcanza para diagnosticarlo. No hace falta que interpretes nada.
 
-## 10. Errores conocidos y qué significan
+## 11. Errores conocidos y qué significan
 
 | Mensaje | Qué pasa |
 |---|---|
@@ -152,7 +180,7 @@ Con eso alcanza para diagnosticarlo. No hace falta que interpretes nada.
 | `Could not resolve net.minecraftforge` | Problema de red, o la versión de Forge en gradle.properties no existe. Confirmala en files.minecraftforge.net para 1.20.1. |
 | `BUILD FAILED con errores que mencionan archivos .java` | Es lo esperable: errores del código del mod. Copiá el texto y mandalo, no hay nada que puedas hacer de tu lado. |
 
-## 11. Opcional: una comprobación sin Minecraft
+## 12. Opcional: una comprobación sin Minecraft
 
 Si querés verificar algo sin esperar las descargas, hay una parte del mod que se puede probar sola: la matemática que genera las formas de las nubes. Desde la misma terminal, en la carpeta del proyecto, escribí estas dos líneas, una y después la otra:
 

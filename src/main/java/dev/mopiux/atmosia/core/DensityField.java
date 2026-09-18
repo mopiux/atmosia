@@ -19,16 +19,39 @@ public final class DensityField {
     /** Cuánto oscurece la base de la capa respecto del techo. */
     private static final float BOTTOM_SHADE = 0.62F;
 
+    /**
+     * Cobertura máxima admitida. Con cobertura 1.0 no queda un solo punto del cielo por debajo del
+     * umbral y el resultado es una losa uniforme de horizonte a horizonte, que no es "muchas nubes"
+     * sino ninguna: sin huecos no hay formas que mirar.
+     */
+    private static final double MAX_COVERAGE = 0.95D;
+
     private final NoiseField noise;
     private final CloudLayerDef layer;
+    private final double coverageScale;
 
     public DensityField(NoiseField noise, CloudLayerDef layer) {
+        this(noise, layer, 1.0D);
+    }
+
+    /**
+     * @param coverageScale multiplicador de cobertura del jugador. 1.0 deja la capa como fue
+     *                      diseñada; más alto agranda las formaciones, más bajo despeja el cielo.
+     */
+    public DensityField(NoiseField noise, CloudLayerDef layer, double coverageScale) {
         this.noise = noise;
         this.layer = layer;
+        this.coverageScale = coverageScale;
     }
 
     public CloudLayerDef layer() {
         return this.layer;
+    }
+
+    /** Cobertura de la capa con el ajuste del jugador aplicado y acotada a un rango con sentido. */
+    public double effectiveCoverage() {
+        double scaled = this.layer.coverage() * this.coverageScale;
+        return Math.max(0.0D, Math.min(MAX_COVERAGE, scaled));
     }
 
     /**
@@ -39,7 +62,7 @@ public final class DensityField {
      */
     public double densityAt(double cloudX, double cloudZ) {
         double raw = this.noise.fbm(cloudX / this.layer.noiseScale(), cloudZ / this.layer.noiseScale());
-        double floor = 1.0D - this.layer.coverage();
+        double floor = 1.0D - this.effectiveCoverage();
         if (raw <= floor) {
             return 0.0D;
         }

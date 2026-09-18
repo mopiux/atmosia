@@ -28,6 +28,9 @@ public final class CsvReporter {
 
     private static final String HEADER = String.join(",",
             "timestamp", "scenario", "renderer", "coverage",
+            // El perfil y la cantidad van en la fila: sin ellos, dos corridas del mismo escenario
+            // no son comparables y no hay forma de saberlo después.
+            "cloud_mode", "quality_profile", "coverage_scale",
             "duration_s", "frames",
             "avg_fps", "low_1pct_fps",
             "cpu_frame_avg_ms", "cpu_frame_p95_ms", "cpu_frame_p99_ms", "cpu_frame_max_ms",

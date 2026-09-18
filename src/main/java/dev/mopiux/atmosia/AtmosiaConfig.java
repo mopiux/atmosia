@@ -1,5 +1,8 @@
 package dev.mopiux.atmosia;
 
+import dev.mopiux.atmosia.core.CloudMode;
+import dev.mopiux.atmosia.core.LodLevel;
+import dev.mopiux.atmosia.core.QualityProfile;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -25,7 +28,8 @@ public final class AtmosiaConfig {
 
     public static final class Client {
 
-        public final ForgeConfigSpec.BooleanValue enabled;
+        public final ForgeConfigSpec.EnumValue<CloudMode> cloudMode;
+        public final ForgeConfigSpec.EnumValue<QualityProfile> qualityProfile;
         public final ForgeConfigSpec.DoubleValue distanceMultiplier;
         public final ForgeConfigSpec.DoubleValue coverageScale;
         public final ForgeConfigSpec.DoubleValue speedScale;
@@ -36,12 +40,32 @@ public final class AtmosiaConfig {
         public final ForgeConfigSpec.LongValue seedOverride;
         public final ForgeConfigSpec.BooleanValue standDownForShaderPacks;
 
+        /**
+         * Los valores de rendimiento que efectivamente rigen, con el perfil ya aplicado.
+         *
+         * Un solo lugar resuelve "perfil o archivo", así que no hay forma de que una parte del
+         * renderer lea el perfil y otra los valores sueltos.
+         */
+        public QualityProfile.Settings resolvedQuality() {
+            QualityProfile.Settings fromFile = new QualityProfile.Settings(
+                    this.distanceMultiplier.get(),
+                    LodLevel.HIGH,
+                    this.regionsPerFrame.get(),
+                    this.quadsPerFrame.get(),
+                    this.maxCachedRegions.get());
+            return this.qualityProfile.get().resolve(fromFile);
+        }
+
         Client(ForgeConfigSpec.Builder builder) {
             builder.comment("Atmosia — nubes procedurales. Todo es de cliente.").push("general");
 
-            this.enabled = builder
-                    .comment("Con false, Atmosia no dibuja nada y devuelve las nubes vanilla.")
-                    .define("enabled", true);
+            this.cloudMode = builder
+                    .comment("Qué nubes se dibujan.",
+                             "ATMOSIA: las del mod, con las vanilla apagadas.",
+                             "VANILLA: las originales del juego, como si el mod no estuviera.",
+                             "NONE: ninguna de las dos, cielo despejado.",
+                             "VANILLA es el modo a usar para medir la línea base del benchmark.")
+                    .defineEnum("cloudMode", CloudMode.ATMOSIA);
 
             this.standDownForShaderPacks = builder
                     .comment("Desactivarse cuando hay un shader pack activo.",
@@ -51,8 +75,15 @@ public final class AtmosiaConfig {
 
             builder.pop().comment("Alcance y calidad").push("quality");
 
+            this.qualityProfile = builder
+                    .comment("Perfil grafico. LOW, MEDIUM y HIGH mandan sobre distanceMultiplier y",
+                             "sobre todo el bloque [budget]: los valores sueltos de abajo se",
+                             "ignoran. Con CUSTOM pasa al reves y manda el archivo.")
+                    .defineEnum("qualityProfile", QualityProfile.MEDIUM);
+
             this.distanceMultiplier = builder
-                    .comment("Multiplicador sobre el render distance del jugador para decidir",
+                    .comment("Solo se usa con qualityProfile = CUSTOM.",
+                             "Multiplicador sobre el render distance del jugador para decidir",
                              "hasta dónde llegan las nubes. No es una distancia fija a propósito:",
                              "generar nubes mucho más lejos de lo que el mundo dibuja es trabajo",
                              "tirado, y quedarse corto se ve peor que no tener nubes.")
@@ -67,7 +98,10 @@ public final class AtmosiaConfig {
                     .comment("Multiplicador de la velocidad de deriva de todas las capas.")
                     .defineInRange("speedScale", 1.0D, 0.0D, 8.0D);
 
-            builder.pop().comment("Presupuesto de rendimiento (Sección 8.2)").push("budget");
+            builder.pop()
+                    .comment("Presupuesto de rendimiento (Sección 8.2).",
+                             "Todo este bloque solo se usa con qualityProfile = CUSTOM.")
+                    .push("budget");
 
             this.regionsPerFrame = builder
                     .comment("Máximo de regiones que se suben a GPU por frame.",

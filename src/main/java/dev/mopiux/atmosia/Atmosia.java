@@ -22,6 +22,9 @@ public class Atmosia {
         // que cada evento llegara dos veces y que cada frame se midiera duplicado.
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, AtmosiaConfig.SPEC);
+            // El registro del menú se hace desde una clase aparte: nombrar una pantalla acá
+            // cargaría clases de cliente en un servidor dedicado, donde no existen.
+            dev.mopiux.atmosia.client.gui.AtmosiaConfigGui.register();
         }
     }
 }

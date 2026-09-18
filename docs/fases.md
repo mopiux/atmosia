@@ -124,8 +124,65 @@ caída pareja. Y `camera_spin` siendo el peor escenario apunta al culling y al o
 es justo lo que ese escenario existe para estresar.
 
 Falta la línea base de vanilla, que no se pudo medir porque vanilla estaba dibujándose encima. Con
-la supresión arreglada, ahora se puede: basta poner `enabled=false` en la configuración y correr los
-mismos escenarios.
+la supresión arreglada, ahora se puede: poner el modo de nubes en **Vanilla** desde el menú del mod
+(o `cloudMode = VANILLA` en la configuración) y correr los mismos escenarios.
+
+## Hallazgos de la segunda prueba real (2026-09-18)
+
+**Las nubes vanilla seguían apareciendo.** La corrección anterior apagaba el ajuste de nubes del
+juego una sola vez, al activarse el mod, y daba el trabajo por hecho. Aplicar una vez y confiar deja
+demasiadas formas de perder el ajuste: el menú de opciones lo reescribe al cerrarse, una recarga del
+archivo de opciones lo devuelve a su valor guardado, y cualquier otro mod que lo toque gana por ser
+el último. Ninguna de esas se puede prevenir desde afuera de LevelRenderer, pero todas se corrigen:
+la supresión ahora se reaplica una vez por tick y cuenta cuántas veces tuvo que hacerlo.
+
+Ese contador es la parte que faltaba. La primera prueba terminó en una pregunta que nadie podía
+responder —si las nubes que se veían eran vanilla o de Atmosia— porque la única evidencia estaba en
+el log. Ahora el estado está a la vista en el menú del mod, y el modo **Ninguna** deja el cielo
+completamente vacío: si con ese modo queda alguna nube, es vanilla y la supresión falló. Eso es una
+respuesta verificable, no una impresión.
+
+También se corrigió que `coverageScale` estaba declarado en la configuración y no lo leía nadie: el
+control de cantidad de nubes existía en el archivo y no hacía absolutamente nada.
+
+La versión del mod pasa a 0.2.0. Hasta ahora todas las builds decían 0.0.1, así que la lista de mods
+no permitía distinguir si lo que se estaba probando tenía las correcciones o no.
+
+### Menú de configuración
+
+El mod ya aparecía en la lista con el botón "Configuración" inerte. Ahora abre una pantalla con tres
+controles:
+
+| Control | Qué hace |
+|---|---|
+| **Nubes** | `Atmosia` / `Vanilla` / `Ninguna`. Es el interruptor principal y el diagnóstico. |
+| **Calidad** | `Bajo` / `Medio` / `Alto` / `Personalizado`. |
+| **Cantidad de nubes** | 20% a 200% de la cobertura de diseño de cada capa. |
+
+Más un panel de estado que muestra el ajuste de nubes del juego, si Atmosia está dibujando, cuántas
+regiones tiene en memoria y cuántas veces hubo que reaplicar la supresión.
+
+Los tres perfiles se mueven en los dos ejes que de verdad cuestan —cortes por capa y alcance del
+domo— y en ninguno más. En particular **ningún perfil agranda la celda**: una celda grande se lee
+como un rectángulo en el cielo por lejos que esté, y eso es un defecto visual, no un ajuste de
+calidad. Es la misma lección de la primera prueba, ahora convertida en invariante con test.
+
+| | Bajo | Medio | Alto |
+|---|---|---|---|
+| Multiplicador de distancia | 1,5 | 3,0 | 4,5 |
+| Cortes por capa (cerca) | 4 | 8 | 8 |
+| Cuádruples por frame | 8.000 | 24.000 | 64.000 |
+| Regiones en caché | 128 | 384 | 768 |
+
+Cambiar el perfil no vacía la caché: el renderer ya detecta región por región que el LOD cambió y la
+reemplaza sin abrir huecos. Cambiar la cantidad sí la vacía, porque la densidad misma cambia y eso
+no se puede deducir de la clave de la región. Los resultados de densidad que estaban en vuelo cuando
+se cambió la cantidad se descartan al llegar, para que no entre al cielo un pedazo del cielo
+anterior.
+
+El CSV del benchmark gana tres columnas —`cloud_mode`, `quality_profile`, `coverage_scale`— porque
+sin ellas dos corridas del mismo escenario dejan de ser comparables y no hay forma de notarlo
+después.
 
 ## Limitaciones conocidas
 
@@ -139,7 +196,9 @@ mismos escenarios.
   resulta ser el cuello de botella —que es lo probable—, esta es la primera optimización a probar.
 - **El ajuste de nubes del juego queda cambiado mientras Atmosia está activo.** Es el precio de
   suprimir vanilla sin mixin. Se restaura al desactivarse, pero un cierre abrupto del juego puede
-  dejarlo en OFF.
+  dejarlo en OFF. Además, mientras Atmosia dibuja, cambiar ese ajuste desde el menú de opciones de
+  Minecraft no tiene efecto: Atmosia lo vuelve a apagar al tick siguiente. El interruptor que manda
+  es el del menú del mod.
 - **Detección de shader packs por presencia del mod, no por pack cargado.** Es conservador: con
   Iris u Oculus instalados Atmosia se desactiva aunque no haya pack activo. Afinarlo requiere la
   API de Iris, que no es estable entre versiones.

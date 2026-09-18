@@ -2,6 +2,7 @@ package dev.mopiux.atmosia.client;
 
 import dev.mopiux.atmosia.AtmosiaConfig;
 import dev.mopiux.atmosia.bench.CloudMetricsProvider;
+import dev.mopiux.atmosia.core.CloudMode;
 import javax.annotation.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -32,6 +33,9 @@ public final class AtmosiaClient {
     private static boolean standDown;
     private static boolean reported;
 
+    @Nullable
+    private static String standDownReason;
+
     private AtmosiaClient() {
     }
 
@@ -44,18 +48,41 @@ public final class AtmosiaClient {
         return renderer != null && !standDown;
     }
 
-    /** Evalúa si corresponde estar activo y arma o destruye el renderer en consecuencia. */
+    /**
+     * Evalúa qué corresponde hacer y ajusta el estado en consecuencia. Una vez por tick.
+     *
+     * Las dos decisiones —si se suprimen las nubes vanilla y si Atmosia dibuja las suyas— salen del
+     * mismo modo pero son independientes: el modo NINGUNA suprime sin dibujar, y es el que convierte
+     * "¿quedaron nubes vanilla?" en una pregunta que el jugador puede responder mirando el cielo.
+     */
     public static void refresh(@Nullable ClientLevel level) {
-        if (level == null || !AtmosiaConfig.CLIENT.enabled.get() || shouldStandDown()) {
+        if (level == null) {
+            shutdown();
+            VanillaCloudSuppressor.uninstall();
+            return;
+        }
+
+        CloudMode mode = AtmosiaConfig.CLIENT.cloudMode.get();
+        if (shouldStandDown()) {
+            // Otro mod gobierna el cielo: se le devuelve entero, nubes vanilla incluidas.
+            shutdown();
+            VanillaCloudSuppressor.uninstall();
+            return;
+        }
+
+        if (mode.suppressesVanilla()) {
+            VanillaCloudSuppressor.install();
+            VanillaCloudSuppressor.enforce();
+        } else {
+            VanillaCloudSuppressor.uninstall();
+        }
+
+        if (!mode.drawsAtmosia()) {
             shutdown();
             return;
         }
+
         if (renderer == null) {
-            if (!VanillaCloudSuppressor.install()) {
-                // El jugador tiene las nubes apagadas. No se activa nada: ni las vanilla ni las
-                // propias, que es lo que ese ajuste significa.
-                return;
-            }
             long seed = resolveSeed(level);
             renderer = new CloudRenderer(seed);
             CloudMetricsProvider.Registry.set(renderer);
@@ -64,12 +91,28 @@ public final class AtmosiaClient {
         }
     }
 
+    /** Tira la geometría y la vuelve a construir. Para cambios que la caché no puede detectar. */
+    public static void invalidate() {
+        if (renderer != null) {
+            long seed = renderer.seed();
+            renderer.close();
+            renderer = new CloudRenderer(seed);
+            CloudMetricsProvider.Registry.set(renderer);
+        }
+    }
+
+    /** Por qué Atmosia cedió el cielo, o null si no cedió. */
+    @Nullable
+    public static String standDownReason() {
+        return standDown ? standDownReason : null;
+    }
+
+    /** Suelta el renderer. No toca el ajuste de nubes del juego: de eso decide {@link #refresh}. */
     public static void shutdown() {
         if (renderer != null) {
             renderer.close();
             renderer = null;
             CloudMetricsProvider.Registry.set(null);
-            VanillaCloudSuppressor.uninstall();
             LOGGER.info("Atmosia desactivado.");
         }
     }
@@ -103,6 +146,7 @@ public final class AtmosiaClient {
             }
         }
 
+        standDownReason = reason;
         if (standDown && !reported) {
             reported = true;
             LOGGER.info("Atmosia se desactiva: {}. Las nubes vanilla quedan como están.", reason);

@@ -11,6 +11,7 @@ import dev.mopiux.atmosia.core.DensityField;
 import dev.mopiux.atmosia.core.LodLevel;
 import dev.mopiux.atmosia.core.LodSelector;
 import dev.mopiux.atmosia.core.NoiseField;
+import dev.mopiux.atmosia.core.QualityProfile;
 import dev.mopiux.atmosia.core.RegionKey;
 import dev.mopiux.atmosia.core.RegionPriority;
 import dev.mopiux.atmosia.core.VerticalFade;
@@ -44,8 +45,14 @@ public final class CloudRenderer implements CloudMetricsProvider {
 
     private final Map<RegionKey, RegionMesh> cache = new HashMap<>();
     private final List<Entry> drawList = new ArrayList<>();
-    private final CloudBudget budget;
     private final GenerationQueue queue;
+
+    /** No es final: el perfil gráfico se cambia en caliente desde el menú. */
+    private CloudBudget budget;
+
+    /** Los valores con los que se construyó lo que hay en caché ahora mismo. */
+    private QualityProfile.Settings appliedQuality;
+    private double appliedCoverageScale;
     private final VerticalFade verticalFade = VerticalFade.defaults();
     private final NoiseField noise;
     private final long seed;
@@ -67,11 +74,48 @@ public final class CloudRenderer implements CloudMetricsProvider {
     public CloudRenderer(long seed) {
         this.seed = seed;
         this.noise = new NoiseField(seed);
-        this.budget = new CloudBudget(
-                AtmosiaConfig.CLIENT.regionsPerFrame.get(),
-                AtmosiaConfig.CLIENT.quadsPerFrame.get(),
-                AtmosiaConfig.CLIENT.maxCachedRegions.get());
+        this.appliedQuality = AtmosiaConfig.CLIENT.resolvedQuality();
+        this.appliedCoverageScale = AtmosiaConfig.CLIENT.coverageScale.get();
+        this.budget = budgetFor(this.appliedQuality);
         this.queue = new GenerationQueue(AtmosiaConfig.CLIENT.generationThreads.get());
+    }
+
+    private static CloudBudget budgetFor(QualityProfile.Settings quality) {
+        return new CloudBudget(quality.regionsPerFrame(), quality.quadsPerFrame(),
+                quality.maxCachedRegions());
+    }
+
+    /**
+     * Relee la configuración y reacciona a lo que haya cambiado desde el frame anterior.
+     *
+     * La distinción importante es cuál de los dos ajustes obliga a tirar la caché. El perfil solo
+     * cambia qué nivel de detalle le toca a cada región, y eso el renderer ya lo detecta región por
+     * región y lo reemplaza sin huecos. La cantidad de nubes cambia la densidad misma: las mallas
+     * que ya están en memoria describen un cielo que ya no es el pedido, y no hay forma de saberlo
+     * mirando su clave. Esas hay que rehacerlas.
+     */
+    private void applyConfigChanges() {
+        QualityProfile.Settings quality = AtmosiaConfig.CLIENT.resolvedQuality();
+        if (!quality.equals(this.appliedQuality)) {
+            this.appliedQuality = quality;
+            this.budget = budgetFor(quality);
+        }
+
+        double coverageScale = AtmosiaConfig.CLIENT.coverageScale.get();
+        if (coverageScale != this.appliedCoverageScale) {
+            this.appliedCoverageScale = coverageScale;
+            this.flushGeometry();
+        }
+    }
+
+    /** Tira toda la geometría cacheada. El cielo se vuelve a llenar con el presupuesto de siempre. */
+    private void flushGeometry() {
+        for (RegionMesh mesh : this.cache.values()) {
+            mesh.close();
+        }
+        this.cache.clear();
+        this.drawList.clear();
+        this.deferred.clear();
     }
 
     public long seed() {
@@ -88,6 +132,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
     public void render(PoseStack poseStack, Matrix4f projection, Camera camera, ClientLevel level,
                        float partialTick, @Nullable Frustum frustum) {
         this.frame++;
+        this.applyConfigChanges();
         this.budget.beginFrame();
         this.drawList.clear();
         this.lastQuads = 0;
@@ -101,7 +146,8 @@ public final class CloudRenderer implements CloudMetricsProvider {
         Vec3 cameraPos = camera.getPosition();
         LodSelector selector = LodSelector.forRenderDistance(
                 Minecraft.getInstance().options.renderDistance().get(),
-                AtmosiaConfig.CLIENT.distanceMultiplier.get());
+                this.appliedQuality.distanceMultiplier(),
+                this.appliedQuality.detailCap());
 
         Vector3f look = camera.getLookVector();
         float pitch = camera.getXRot();
@@ -193,7 +239,8 @@ public final class CloudRenderer implements CloudMetricsProvider {
             if (this.queue.isSaturated()) {
                 break;
             }
-            this.queue.submit(new DensityJob(item.key, item.layer, item.lod, this.noise));
+            this.queue.submit(new DensityJob(item.key, item.layer, item.lod, this.noise,
+                    this.appliedCoverageScale));
         }
     }
 
@@ -241,6 +288,12 @@ public final class CloudRenderer implements CloudMetricsProvider {
 
     /** Construye una región si entra en el presupuesto. Si no entra, la difiere y devuelve false. */
     private boolean tryBuild(DensityJob.Result result) {
+        if (result.job().coverageScale() != this.appliedCoverageScale) {
+            // Se calculó con otra cantidad de nubes y llegó después del cambio. Construirla metería
+            // en el cielo un pedazo del cielo anterior; se descarta y se vuelve a pedir cuando haga
+            // falta, que es en el mismo frame.
+            return true;
+        }
         int quads = result.estimatedQuads();
         if (!this.budget.canGenerate(quads) && !this.budget.canGenerateAtLeastOne()) {
             this.defer(result);
@@ -348,12 +401,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
     /** Libera todo. Al cambiar de mundo o de configuración. */
     public void close() {
         this.queue.shutdown();
-        for (RegionMesh mesh : this.cache.values()) {
-            mesh.close();
-        }
-        this.cache.clear();
-        this.drawList.clear();
-        this.deferred.clear();
+        this.flushGeometry();
     }
 
     // -------------------------------------------------------------------------------------

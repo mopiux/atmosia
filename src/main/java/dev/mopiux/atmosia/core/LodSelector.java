@@ -15,11 +15,16 @@ public final class LodSelector {
     private final double lowUntil;
     private final double maxDistance;
 
-    private LodSelector(double highUntil, double mediumUntil, double lowUntil, double maxDistance) {
+    /** Nivel más detallado que este selector puede devolver, venga la distancia que venga. */
+    private final LodLevel detailCap;
+
+    private LodSelector(double highUntil, double mediumUntil, double lowUntil, double maxDistance,
+                        LodLevel detailCap) {
         this.highUntil = highUntil;
         this.mediumUntil = mediumUntil;
         this.lowUntil = lowUntil;
         this.maxDistance = maxDistance;
+        this.detailCap = detailCap;
     }
 
     /**
@@ -29,17 +34,39 @@ public final class LodSelector {
      * @param multiplier           multiplicador configurable sobre esa distancia
      */
     public static LodSelector forRenderDistance(int renderDistanceChunks, double multiplier) {
+        return forRenderDistance(renderDistanceChunks, multiplier, LodLevel.HIGH);
+    }
+
+    /**
+     * Igual, pero con un tope de detalle: lo que impone el perfil gráfico.
+     *
+     * El tope no acorta el domo ni cambia el tamaño de celda. Solo impide que las regiones cercanas
+     * usen el nivel más caro, que es donde está el relleno.
+     *
+     * @param detailCap nivel más detallado permitido
+     */
+    public static LodSelector forRenderDistance(int renderDistanceChunks, double multiplier,
+                                                LodLevel detailCap) {
         double worldDistance = renderDistanceChunks * 16.0D;
         // El piso es generoso a propósito: un domo de nubes corto se nota muchísimo más que uno
         // largo, porque el borde queda dentro del campo de visión y el cielo se ve recortado.
         double max = Math.max(512.0D, worldDistance * multiplier);
         // Las proporciones replican los tramos del documento (300/800/1500 sobre 1500).
-        return new LodSelector(max * 0.20D, max * 0.53D, max, max);
+        return new LodSelector(max * 0.20D, max * 0.53D, max, max, detailCap);
     }
 
     /** Escala fija, para tests y para la configuración manual. */
     public static LodSelector fixed(double maxDistance) {
-        return new LodSelector(maxDistance * 0.20D, maxDistance * 0.53D, maxDistance, maxDistance);
+        return fixed(maxDistance, LodLevel.HIGH);
+    }
+
+    public static LodSelector fixed(double maxDistance, LodLevel detailCap) {
+        return new LodSelector(maxDistance * 0.20D, maxDistance * 0.53D, maxDistance, maxDistance,
+                detailCap);
+    }
+
+    public LodLevel detailCap() {
+        return this.detailCap;
     }
 
     public double maxDistance() {
@@ -52,15 +79,24 @@ public final class LodSelector {
             return null;
         }
         if (distance <= this.highUntil) {
-            return LodLevel.HIGH;
+            return this.capped(LodLevel.HIGH);
         }
         if (distance <= this.mediumUntil) {
-            return LodLevel.MEDIUM;
+            return this.capped(LodLevel.MEDIUM);
         }
         if (distance <= this.lowUntil) {
-            return LodLevel.LOW;
+            return this.capped(LodLevel.LOW);
         }
-        return LodLevel.MINIMAL;
+        return this.capped(LodLevel.MINIMAL);
+    }
+
+    /**
+     * Aplica el tope del perfil. El orden del enum va del más detallado al menos, así que el tope
+     * gana cuando el nivel que pedía la distancia es más fino que él, y nunca al revés: un perfil
+     * alto no puede forzar detalle donde la distancia no lo justifica.
+     */
+    private LodLevel capped(LodLevel level) {
+        return level.ordinal() < this.detailCap.ordinal() ? this.detailCap : level;
     }
 
     /**
