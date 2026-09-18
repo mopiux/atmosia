@@ -22,6 +22,8 @@ pendientes necesitan Minecraft y Forge instalados para leer el código real, com
 | `docs/Atmosia_Documento_de_Diseno_v1.1.docx` | La especificación del proyecto. Es la versión vigente: hay que leer esta. |
 | `docs/Atmosia_Documento_de_Diseno_v1.0.docx` | El original, conservado solo como referencia histórica. |
 | `docs/fase-0-analisis-y-arquitectura.md` | La respuesta a lo que pide el documento: arquitectura propuesta, decisiones con sus alternativas, riesgos y verificaciones pendientes. |
+| `docs/guia-de-prueba.md` (y su versión `.docx`) | **Empezá por acá si vas a compilar y probar.** Pasos concretos, cómo leer el CSV y qué hace falta decidir. |
+| `docs/benchmark.md` | Cómo funciona el harness de medición, qué mide y qué no. |
 
 ## Qué hace falta para seguir
 
