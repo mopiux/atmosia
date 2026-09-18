@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+out/
+# ForgeGradle
+run/
+runs/
+logs/
+# IDE
+.idea/
+*.iml
+.vscode/
+.eclipse/
+bin/
+.classpath
+.project
+.settings/
+# Resultados de benchmark generados localmente
+atmosia-benchmarks/

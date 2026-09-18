@@ -1,0 +1,61 @@
+// Scaffolding mínimo para Forge 1.20.1 (ForgeGradle 6).
+//
+// SIN COMPILAR: el entorno donde se escribió esto no tiene acceso a maven.minecraftforge.net
+// ni a los servidores de Mojang, así que este archivo no pudo ejecutarse una sola vez.
+// Se espera que la primera compilación requiera ajustes menores.
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+version = "${mod_version}"
+group = "${mod_group_id}"
+base { archivesName = "${mod_id}-${minecraft_version}" }
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'info'
+            mods { "${mod_id}" { source sourceSets.main } }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+        mod_id: mod_id, mod_name: mod_name, mod_version: mod_version,
+        mod_license: mod_license, minecraft_version: minecraft_version
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title'   : mod_id,
+            'Specification-Version' : '1',
+            'Implementation-Title'  : mod_name,
+            'Implementation-Version': mod_version
+        ])
+    }
+}
