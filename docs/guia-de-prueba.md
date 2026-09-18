@@ -14,7 +14,7 @@ Lo que no contiene es un archivo .jar que puedas instalar, y la razón está aba
 >
 > Nada del código que toca Minecraft se compiló jamás. El entorno donde se escribió no tenía acceso a los servidores de Forge ni de Mojang, así que no pudo descargarse el MDK ni ejecutarse una sola vez. No hay .jar porque no hubo forma de generarlo.
 >
-> Dalo por hecho: la primera compilación va a fallar en algo. Los puntos donde la API de 1.20.1 hay que confirmarla están marcados con VERIFICAR en el código, y la versión de Forge quedó como REEMPLAZAR en vez de un número puesto de memoria.
+> Dalo por hecho: la primera compilación va a fallar en algo. Los puntos donde la API de 1.20.1 hay que confirmarla están marcados con VERIFICAR en el código.
 >
 > Lo que sí está compilado y probado es el núcleo procedural —ruido, densidad, LOD, fade, prioridad, presupuesto— porque se escribió a propósito sin depender de Minecraft. Son 66 comprobaciones que corren sin Gradle. El detalle está en docs/fases.md.
 
@@ -45,8 +45,8 @@ https://github.com/mopiux/atmosia
 ## 3. Pasos
 
 1. Clonar el repositorio: git clone https://github.com/mopiux/atmosia
-2. Abrir gradle.properties y reemplazar forge_version=REEMPLAZAR por la versión exacta de Forge para 1.20.1 (la recomendada de files.minecraftforge.net, rama 47.x). Este es el único valor que hay que completar a mano.
-3. Compilar: ./gradlew build (en Windows, gradlew.bat build). Si falla, guardá el error tal cual: es información útil, no un problema tuyo.
+2. Compilar: ./gradlew build (en Windows, gradlew.bat build). La primera vez descarga el MDK entero y tarda varios minutos. Si falla, guardá el error tal cual: es información útil, no un problema tuyo.
+3. Si Gradle no encuentra la versión de Forge, corregir forge_version en gradle.properties con la recomendada de files.minecraftforge.net para 1.20.1. Viene puesta la 47.4.10, tomada de una búsqueda y no del repositorio Maven, así que puede necesitar ajuste.
 4. Levantar el cliente de desarrollo: ./gradlew runClient
 5. Crear un mundo nuevo en creativo, con trampas activadas. Anotá si es mundo normal o superplano, porque cambia lo que se renderiza y por lo tanto los números.
 6. Verificar que el mod cargó: escribir /atmosiabench list en el chat. Debería listar nueve escenarios. Si el comando no existe, el mod no cargó y eso es lo primero a resolver.

@@ -31,7 +31,8 @@ Lo que falta es un entorno con Minecraft: compilar, corregir lo que salte, y med
 
 ## Qué hace falta para seguir
 
-1. **Completar `forge_version` en `gradle.properties`** (está como `REEMPLAZAR`) y compilar.
+1. **Compilar**: `./gradlew build`. La versión de Forge ya está puesta (47.4.10); si Gradle no la
+   encuentra, corregirla en `gradle.properties`.
 2. **Corregir lo que salte.** Los puntos donde la API de 1.20.1 hay que confirmarla están
    marcados con `VERIFICAR` en el código.
 3. **Medir contra vanilla** con el harness, y recién entonces fijar el criterio de aceptación.
