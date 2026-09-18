@@ -6,14 +6,17 @@ esta primera etapa es una base de renderizado, no un simulador de clima.
 
 ## Estado actual
 
-**Fase 0 aprobada. Todavía no hay código.**
+**Código completo del renderer, sin compilar nunca.**
 
-El documento de diseño exige que cada fase se presente y se apruebe antes de pasar a la
-siguiente. La Fase 0 —investigación y diseño— fue aprobada con una enmienda sobre las dos
-verificaciones de impacto alto, registrada en el propio entregable.
+La Fase 0 fue aprobada y las fases siguientes están escritas: supresión de las nubes vanilla,
+generación procedural, caché con presupuesto, LOD, culling con fade, multi-capa y sombreado.
 
-Lo que falta para arrancar la Fase 1 no es una decisión, es un entorno: las verificaciones
-pendientes necesitan Minecraft y Forge instalados para leer el código real, compilar y medir.
+El asterisco importa: **nada de lo que toca la API de Minecraft se compiló jamás**, porque el
+entorno donde se escribió no puede descargar Forge ni Mojang. El núcleo procedural —ruido,
+densidad, LOD, fade, prioridad, presupuesto— sí está compilado y probado, porque no depende del
+juego. Ver `docs/fases.md` para el detalle de qué está verificado y qué no.
+
+Lo que falta es un entorno con Minecraft: compilar, corregir lo que salte, y medir.
 
 ## Documentos
 
@@ -24,14 +27,14 @@ pendientes necesitan Minecraft y Forge instalados para leer el código real, com
 | `docs/fase-0-analisis-y-arquitectura.md` | La respuesta a lo que pide el documento: arquitectura propuesta, decisiones con sus alternativas, riesgos y verificaciones pendientes. |
 | `docs/guia-de-prueba.md` (y su versión `.docx`) | **Empezá por acá si vas a compilar y probar.** Pasos concretos, cómo leer el CSV y qué hace falta decidir. |
 | `docs/benchmark.md` | Cómo funciona el harness de medición, qué mide y qué no. |
+| `docs/fases.md` | Qué cubre cada fase del documento de diseño y en qué estado de verificación está. |
 
 ## Qué hace falta para seguir
 
-1. **Aprobar (o discutir) la decisión de arquitectura central** de la Fase 0: la representación
-   geométrica. De ella cuelgan LOD, caché, culling y transparencia.
-2. **Un entorno con Minecraft y Forge disponibles.** Las verificaciones de la Sección 10 del
-   entregable de Fase 0 requieren leer el código real de 1.20.1, y compilar y ejecutar el juego.
-   No se pudieron hacer donde se redactó ese documento.
+1. **Completar `forge_version` en `gradle.properties`** (está como `REEMPLAZAR`) y compilar.
+2. **Corregir lo que salte.** Los puntos donde la API de 1.20.1 hay que confirmarla están
+   marcados con `VERIFICAR` en el código.
+3. **Medir contra vanilla** con el harness, y recién entonces fijar el criterio de aceptación.
 
 ## Principio del proyecto
 

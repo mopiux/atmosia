@@ -7,8 +7,9 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 description='''
-Sistema de nubes procedurales. En esta etapa el mod solo contiene el harness de benchmark:
-todavía no renderiza nubes propias.
+Sistema de nubes procedurales que reemplaza por completo las nubes vanilla: campo de densidad
+por región, slices horizontales, LOD por distancia y capa, culling con fade y caché con
+presupuesto por frame. Incluye un harness de benchmark para medir contra vanilla.
 '''
 
 [[dependencies.${mod_id}]]
