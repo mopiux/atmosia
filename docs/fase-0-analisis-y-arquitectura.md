@@ -1,8 +1,11 @@
 # Atmosia — Fase 0: análisis, arquitectura propuesta y verificaciones pendientes
 
-Estado: **propuesta, esperando confirmación explícita.** Según la Sección 15 del documento de
-diseño, esta fase no escribe código de gameplay ni de renderizado. No se ha creado scaffolding
-del mod todavía: eso pertenece a la Fase 1 y requiere aprobación previa de este documento.
+Estado: **aprobada el 2026-09-18, con una enmienda.** La arquitectura, el modelo de
+transparencia, la concurrencia, la seed, la compatibilidad y la configuración quedan aprobados
+tal como están. La enmienda afecta a las Verificaciones 1 y 4 —las dos de impacto alto— que
+deben incluir la revisión de cómo resuelve lo mismo el mod `simple-clouds` antes de decidir
+entre Ruta A/C y entre target reducido/malla extruida. Esa revisión está registrada en la
+Sección 9.1, con una restricción de licencia importante que la limita.
 
 Referencia: `docs/Atmosia_Documento_de_Diseno_v1.1.docx`.
 
@@ -217,11 +220,54 @@ servidor implicaría un componente de servidor, que está fuera del alcance decl
 | Embeddium / Rubidium y similares | Deben poder coexistir: Atmosia no toca el render de chunks. El punto a verificar es el target propio y el modo fabuloso. |
 | Distant Horizons | Altera la distancia efectiva del mundo. Decidir explícitamente qué valor se lee: el render distance de vanilla, no el extendido, salvo configuración expresa. |
 | Otros mods de cielo / clima / dimensiones | Si ya sustituyeron los efectos de dimensión, Atmosia respeta y se desactiva (ver Ruta A). |
+| simple-clouds | Conflicto duro: ambos reemplazan las nubes vanilla. Detectar y desactivarse. Ver Sección 9.1, incluida la restricción de licencia. |
 
-Prior art a revisar antes de la Fase 1: existe al menos un mod de nubes procedurales para Forge
-1.20.1 (`simple-clouds`, de nonamecrackers2). Revisar cómo resuelve la supresión de las nubes
-vanilla y la convivencia con shader packs ahorraría trabajo de investigación y es, además, un
-caso de incompatibilidad directa a contemplar.
+### 9.1 Prior art revisado: simple-clouds
+
+`simple-clouds` (nonamecrackers2) es un mod de nubes procedurales para Forge 1.20.1, publicado
+en Modrinth y CurseForge, actualmente en beta abierta. Se revisó su documentación pública.
+
+**Restricción de licencia — leer antes de seguir.** Está publicado bajo *PolyForm Perimeter
+License 1.0.1*, que es una licencia con cláusula de no competencia explícita: "cualquier
+propósito es un propósito permitido, excepto proveer a otros un producto que compita con el
+software", y aclara que un producto compite "aunque se provea de forma gratuita" y aunque esté
+"portado a otro lenguaje de programación". Atmosia es, por definición, un sustituto funcional de
+simple-clouds. En consecuencia:
+
+- **No se puede tomar, copiar ni derivar código de simple-clouds para Atmosia.** Ni una función,
+  ni un shader, ni una estructura de clases.
+- Leer su código fuente para decidir cómo implementar Atmosia es un riesgo de contaminación que
+  no vale la pena correr: los mismos hechos sobre el render de nubes en 1.20.1 se obtienen del
+  código de Minecraft y de la documentación de Forge, que es la fuente definitiva de todas
+  formas. Por eso esta revisión se limitó a la documentación pública del mod.
+
+**Lo que su documentación pública sí aporta, y es mucho:**
+
+1. **Los compute shaders son viables en Forge 1.20.1.** simple-clouds genera la geometría de las
+   nubes en GPU con compute shaders, iterando una grilla de vóxeles contra capas de ruido 3D.
+   Esto es evidencia de campo contra la duda de la Sección 9.3 del documento de diseño: no es un
+   camino teórico. Sigue sin ser necesario para Atmosia, pero deja de ser una incógnita.
+2. **Una cuarta representación geométrica existe y funciona**: malla generada en GPU a partir de
+   un campo de vóxeles. No estaba entre los candidatos de la Sección 3.1. Es más costosa en
+   geometría y más barata en relleno que la ruta de slices, o sea que ataca la tensión por el
+   otro extremo. Se incorpora como alternativa consciente, no elegida.
+3. **Su autor reconoce impacto notable en frames, sobre todo en GPUs viejas.** Un mod de nubes
+   procedurales bien hecho y con la geometría en GPU igualmente se paga caro. Es un argumento a
+   favor del criterio de aceptación numérico de la Sección 11 de este documento: la meta de
+   "costo parecido a vanilla" es ambiciosa y hay que medirla, no asumirla.
+4. **Corrobora la decisión de seed de la Sección 7.** simple-clouds enfrentó exactamente el mismo
+   problema y lo resolvió igual: en modo solo-cliente la seed es aleatoria por sesión (o fija por
+   configuración del jugador) y no hay coherencia entre jugadores; la sincronización real
+   requiere un componente de servidor. Nuestra decisión —cliente, sin coherencia garantizada,
+   seed configurable— queda validada por un caso real.
+
+**Lo que no aporta y sigue abierto:** cómo suprime el render de nubes vanilla. Eso requeriría
+leer su código, que es justamente lo que la licencia desaconseja. Se obtiene mejor de la fuente
+directa (Verificación 1).
+
+**Como caso de compatibilidad, es un conflicto duro:** dos mods que reemplazan las nubes vanilla
+no pueden coexistir. Atmosia debe detectar simple-clouds y desactivarse, registrándolo en el log,
+igual que con los shader packs.
 
 ---
 
@@ -233,6 +279,12 @@ Cada ítem indica qué abrir, qué buscar y qué decisión dispara el resultado.
    llamada al render de nubes. Determinar de qué condiciones depende (ajuste de nubes del
    jugador, altura de nubes de los efectos de dimensión, valor inválido/NaN).
    → Si una altura inválida suprime el render: **Ruta A**, sin mixin. Si no: **Ruta C**.
+   *Enmienda de aprobación:* debía revisarse antes cómo lo resuelve simple-clouds. Esa revisión
+   se hizo hasta donde la licencia lo permite (Sección 9.1) y **no cubre este punto**: determinar
+   su mecanismo exige leer su código, y hacerlo contamina un proyecto que compite con él. La
+   decisión Ruta A/C se toma contra el código de Minecraft y Forge, que además es la fuente
+   autoritativa. Si el autor del proyecto prefiere revisarlo igualmente, es una decisión suya y
+   debe quedar registrada aquí junto con su motivo.
 2. **Sustitución de efectos de dimensión.** Confirmar cómo se registra o sustituye la entrada de
    efectos del Overworld en 1.20.1 y si Forge ofrece un punto de extensión para ello.
    → Define si la Ruta A es implementable de forma limpia o solo pisando un mapa global.
@@ -242,9 +294,18 @@ Cada ítem indica qué abrir, qué buscar y qué decisión dispara el resultado.
    reducida dentro del pipeline de 1.20.1 sin romper el modo fabuloso ni los mods de
    optimización. **Es el supuesto del que depende toda la Sección 4 de este documento**: si cae,
    hay que revisar el número de slices o pasar al plan B (malla extruida).
+   *Enmienda de aprobación:* la revisión de simple-clouds (Sección 9.1) aporta aquí un dato
+   concreto: existe una tercera salida verificada en producción —generar la malla en GPU con
+   compute shaders— que evita el problema del target reducido por completo, a cambio de mover el
+   costo de relleno a costo de geometría y de depender de compute shaders. Queda como plan C
+   explícito si el target reducido resulta inviable y la malla extruida no alcanza visualmente.
+   No se adopta ahora: implicaría reescribir la Sección 4 entera y depender de una característica
+   que el documento de diseño mantiene fuera de la base jugable.
 5. **Versión exacta de Forge** y mappings, para fijar en `gradle.properties`.
-6. **Compute shaders** (Sección 9.3): dejar constancia de viabilidad en el entorno objetivo,
-   solo como nota para después de la Fase 6. No condiciona nada de lo anterior.
+6. **Compute shaders** (Sección 9.3): la revisión de la Sección 9.1 muestra que hay un mod de
+   nubes en producción para Forge 1.20.1 que los usa, así que la viabilidad deja de ser una
+   incógnita abierta. Queda por confirmar en el hardware y los drivers de referencia, y sigue
+   siendo trabajo posterior a la Fase 6: la base jugable de Atmosia no depende de ellos.
 
 ---
 
@@ -278,14 +339,22 @@ del proyecto, por eso se propone moverlo al principio.
 | Conflicto con shader packs | Medio | Desactivación automática, decidida de antemano |
 | Costo de memoria de las texturas de densidad | Medio | Pool por nivel de LOD con dimensiones fijas; medir VRAM desde la Fase 2 |
 | La calidad visual de la Fase 5 invalida decisiones de las Fases 2–4 | Medio | Prototipo visual desechable en la Fase 1 (Sección 15) |
+| Contaminación de licencia por mirar código de simple-clouds | Medio, y legal en vez de técnico | No leer su fuente; obtener los mismos hechos del código de Minecraft y de la documentación de Forge (Sección 9.1) |
 
 ---
 
 ## 13. Estado
 
-Fase 0 entregada como **propuesta**. No se ha escrito código, ni de producción ni de scaffolding.
+**Fase 0 aprobada el 2026-09-18**, con la enmienda registrada en la cabecera y desarrollada en
+las Verificaciones 1 y 4. La arquitectura de la Sección 4, el modelo de transparencia, la
+concurrencia, la seed, la compatibilidad y la configuración quedan firmes y son la base de la
+Fase 1.
 
-Según la regla de oro del documento, hace falta **confirmación explícita** de estas decisiones
-—especialmente la de la Sección 4 de este documento, que condiciona todo lo demás— antes de
-pasar a la Fase 1. Las verificaciones de la Sección 10 requieren un entorno con Minecraft y
-Forge disponibles, que este entorno no tiene.
+Sigue sin escribirse código. Lo que bloquea el arranque de la Fase 1 no es una decisión sino el
+entorno: las Verificaciones 1 a 5 requieren Minecraft y Forge disponibles para leer el código
+real, compilar y ejecutar, y el entorno donde se redactó este documento no los tiene.
+
+El primer trabajo de la Fase 1 que **no** depende de esas verificaciones es el harness de
+benchmark de la Sección 11, que además hay que correr contra las nubes vanilla antes de escribir
+una línea de Atmosia, para tener la línea base contra la cual ratificar el criterio de
+aceptación.

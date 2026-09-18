@@ -6,11 +6,14 @@ esta primera etapa es una base de renderizado, no un simulador de clima.
 
 ## Estado actual
 
-**Fase 0 — entregada como propuesta, esperando confirmación. Todavía no hay código.**
+**Fase 0 aprobada. Todavía no hay código.**
 
 El documento de diseño exige que cada fase se presente y se apruebe antes de pasar a la
-siguiente. La Fase 0 es investigación y diseño, y termina esperando el visto bueno explícito
-sobre la arquitectura propuesta antes de escribir nada.
+siguiente. La Fase 0 —investigación y diseño— fue aprobada con una enmienda sobre las dos
+verificaciones de impacto alto, registrada en el propio entregable.
+
+Lo que falta para arrancar la Fase 1 no es una decisión, es un entorno: las verificaciones
+pendientes necesitan Minecraft y Forge instalados para leer el código real, compilar y medir.
 
 ## Documentos
 
