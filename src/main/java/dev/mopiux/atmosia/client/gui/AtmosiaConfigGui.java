@@ -17,8 +17,8 @@ public final class AtmosiaConfigGui {
     /** Se llama durante la construcción del mod, solo en cliente. */
     public static void register() {
         ModLoadingContext.get().registerExtensionPoint(
-                ConfigScreenHandler.ConfigGuiFactory.class,
-                () -> new ConfigScreenHandler.ConfigGuiFactory(
+                ConfigScreenHandler.ConfigScreenFactory.class,
+                () -> new ConfigScreenHandler.ConfigScreenFactory(
                         (minecraft, parent) -> new AtmosiaConfigScreen(parent)));
     }
 }
