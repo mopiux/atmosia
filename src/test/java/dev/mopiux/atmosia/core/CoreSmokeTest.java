@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Comprobaciones del núcleo procedural: ruido, densidad, LOD, fade vertical, prioridad y
- * presupuesto. Nada de esto depende de Minecraft, así que se puede verificar de verdad.
+ * Comprobaciones del nucleo procedural: ruido, densidad, LOD, fade vertical, prioridad y
+ * presupuesto. Nada de esto depende de Minecraft, asi que se puede verificar de verdad.
  *
  * Igual que {@code BenchSmokeTest}, es un {@code main} sin dependencias:
  *
@@ -40,12 +40,13 @@ public final class CoreSmokeTest {
         modes();
         stackOpacity();
         prefetch();
+        seams();
 
         System.out.println(fails == 0 ? "\nTODO OK" : "\n" + fails + " FALLAS");
         System.exit(fails == 0 ? 0 : 1);
     }
 
-    /** Perfiles gráficos: que los tres se ordenen y que el tope de detalle mande. */
+    /** Perfiles graficos: que los tres se ordenen y que el tope de detalle mande. */
     static void profiles() {
         QualityProfile.Settings low = QualityProfile.LOW.resolve(null);
         QualityProfile.Settings mid = QualityProfile.MEDIUM.resolve(null);
@@ -236,6 +237,86 @@ public final class CoreSmokeTest {
                 String.format(Locale.ROOT, "%.3f vs %.3f antes", caida, caidaVieja));
     }
 
+    /**
+     * Costuras entre niveles de detalle: la causa de las lineas rectas en el cielo.
+     *
+     * Dos regiones vecinas con distinto nivel comparten un borde recto de 256 bloques. Si las
+     * alturas de sus cortes no coinciden, en esa banda se ven los dos juegos de planos
+     * entrelazados y el alfa acumulado sube. La invariante que lo evita es que las alturas de un
+     * nivel grueso sean un subconjunto exacto de las del fino.
+     */
+    static void seams() {
+        NoiseField n = new NoiseField(3L);
+        DensityField f = new DensityField(n, CloudLayerDef.LOW);
+        LodLevel[] niveles = LodLevel.values();
+
+        java.util.List<java.util.Set<Double>> alturas = new java.util.ArrayList<>();
+        for (LodLevel l : niveles) {
+            java.util.Set<Double> ys = new java.util.TreeSet<>();
+            for (int i = 0; i < l.slices(); i++) {
+                ys.add(Math.round(f.sliceHeight(i, l.slices()) * 1.0E6D) / 1.0E6D);
+            }
+            alturas.add(ys);
+            check("  " + l + " tiene " + l.slices() + " alturas distintas",
+                    ys.size() == l.slices(), ys.size());
+        }
+
+        for (int i = 0; i + 1 < niveles.length; i++) {
+            java.util.Set<Double> fino = alturas.get(i);
+            java.util.Set<Double> grueso = alturas.get(i + 1);
+            check("las alturas de " + niveles[i + 1] + " son subconjunto de " + niveles[i],
+                    fino.containsAll(grueso), grueso + " vs " + fino);
+
+            java.util.Set<Double> union = new java.util.TreeSet<>(fino);
+            union.addAll(grueso);
+            // Es la cuenta que importa: cuantos planos distintos ve un rayo que cruza la costura.
+            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " no agrega planos",
+                    union.size() == fino.size(), union.size() + " planos, el lado fino tiene " + fino.size());
+        }
+
+        // Coplanar no alcanza: si el umbral o el sombreado dependieran del indice, dos cortes a la
+        // misma altura tendrian contenido distinto y la costura se veria igual.
+        for (int i = 0; i + 1 < niveles.length; i++) {
+            int cf = niveles[i].slices();
+            int cg = niveles[i + 1].slices();
+            boolean mismoUmbral = true;
+            boolean mismaSombra = true;
+            for (int ig = 0; ig < cg; ig++) {
+                double t = DensityField.sliceT(ig, cg);
+                int igual = -1;
+                for (int iff = 0; iff < cf; iff++) {
+                    if (Math.abs(DensityField.sliceT(iff, cf) - t) < 1.0E-9D) {
+                        igual = iff;
+                        break;
+                    }
+                }
+                if (igual < 0) {
+                    mismoUmbral = false;
+                    mismaSombra = false;
+                    break;
+                }
+                mismoUmbral &= Math.abs(f.sliceThreshold(ig, cg) - f.sliceThreshold(igual, cf)) < 1.0E-9D;
+                mismaSombra &= Math.abs(f.shade(0.5D, ig, cg) - f.shade(0.5D, igual, cf)) < 1.0E-6F;
+            }
+            check("umbral igual en cortes coplanares " + niveles[i] + "|" + niveles[i + 1], mismoUmbral, "");
+            check("sombreado igual en cortes coplanares " + niveles[i] + "|" + niveles[i + 1], mismaSombra, "");
+        }
+
+        // Los cortes tienen que seguir repartidos por el espesor, no amontonados.
+        for (LodLevel l : niveles) {
+            double min = 1.0D;
+            double max = 0.0D;
+            for (int i = 0; i < l.slices(); i++) {
+                double t = DensityField.sliceT(i, l.slices());
+                min = Math.min(min, t);
+                max = Math.max(max, t);
+            }
+            check("  " + l + " reparte los cortes por el espesor",
+                    min > 0.0D && max < 1.0D && (l.slices() == 1 || max - min > 0.45D),
+                    String.format(Locale.ROOT, "%.4f..%.4f", min, max));
+        }
+    }
+
     /** Prefetch direccional: que anticipe volando y que no haga nada caminando. */
     static void prefetch() {
         MotionPrefetch p = new MotionPrefetch();
@@ -313,7 +394,7 @@ public final class CoreSmokeTest {
     static void noise() {
         NoiseField n = new NoiseField(1234L);
 
-        // Determinismo: es el requisito explícito de la Sección 4.
+        // Determinismo: es el requisito explicito de la Seccion 4.
         check("ruido determinista", n.fbm(12.5, -7.25) == n.fbm(12.5, -7.25), n.fbm(12.5, -7.25));
 
         NoiseField other = new NoiseField(9999L);
@@ -334,7 +415,7 @@ public final class CoreSmokeTest {
         check("media cerca de 0.5", Math.abs(sum / samples - 0.5) < 0.05, sum / samples);
         check("usa todo el rango", max - min > 0.5, max - min);
 
-        // Continuidad: sin saltos entre celdas, o se verían las costuras de la grilla.
+        // Continuidad: sin saltos entre celdas, o se verian las costuras de la grilla.
         double worst = 0.0;
         for (int i = 0; i < 2000; i++) {
             double x = i * 0.01;
@@ -342,7 +423,7 @@ public final class CoreSmokeTest {
         }
         check("continuo (sin costuras de celda)", worst < 0.15, worst);
 
-        // Precisión lejos del origen: el hash trabaja sobre enteros, no sobre floats grandes.
+        // Precision lejos del origen: el hash trabaja sobre enteros, no sobre floats grandes.
         double far = n.fbm(29_000_000.5, 29_000_000.5);
         check("estable lejos del origen", far == n.fbm(29_000_000.5, 29_000_000.5) && far >= 0.0 && far <= 1.0, far);
     }
@@ -419,10 +500,10 @@ public final class CoreSmokeTest {
         }
         check("detalle nunca sube con la distancia", monotonic, previous);
 
-        // Por debajo de cierto render distance manda el piso, así que la proporcionalidad solo vale
-        // por encima de él. El piso es generoso a propósito: la primera prueba real mostró que un
-        // domo corto se ve recortado dentro del campo de visión, y eso se nota mucho más que el
-        // costo de unas regiones de más.
+        // Por debajo de cierto render distance manda el piso, asi que la proporcionalidad solo vale
+        // por encima de el. El piso es generoso a proposito: la primera prueba real mostro que un
+        // domo corto se ve recortado dentro del campo de vision, y eso se nota mucho mas que el
+        // costo de unas regiones de mas.
         check("piso de 512 con render distance bajo",
                 Math.abs(LodSelector.forRenderDistance(4, 1.5).maxDistance() - 512.0) < 1e-9,
                 LodSelector.forRenderDistance(4, 1.5).maxDistance());
@@ -435,7 +516,7 @@ public final class CoreSmokeTest {
                 Math.abs(LodSelector.forRenderDistance(32, 3.0).maxDistance() - 1536.0) < 1e-9,
                 LodSelector.forRenderDistance(32, 3.0).maxDistance());
 
-        // Con el domo por defecto, ninguna celda llega a verse como una sábana en el cielo.
+        // Con el domo por defecto, ninguna celda llega a verse como una sabana en el cielo.
         int celdaMasGrande = 0;
         for (LodLevel l : LodLevel.values()) {
             celdaMasGrande = Math.max(celdaMasGrande, l.cellSize());

@@ -1,11 +1,11 @@
 package dev.mopiux.atmosia.core;
 
 /**
- * Presupuesto por frame (Sección 8.2).
+ * Presupuesto por frame (Seccion 8.2).
  *
  * El renderer no genera "todo lo que haga falta": genera lo que entra en el presupuesto y deja el
  * resto para los frames siguientes, respetando el orden de prioridad. Es lo que garantiza que
- * ninguna actualización congele el juego, ni siquiera un instante.
+ * ninguna actualizacion congele el juego, ni siquiera un instante.
  */
 public final class CloudBudget {
 
@@ -36,15 +36,15 @@ public final class CloudBudget {
         this.quadsThisFrame = 0;
     }
 
-    /** Si todavía entra una región de {@code quads} cuádruples en este frame. */
+    /** Si todavia entra una region de {@code quads} cuadruples en este frame. */
     public boolean canGenerate(int quads) {
         return this.regionsThisFrame < this.maxRegionsPerFrame
                 && this.quadsThisFrame + quads <= this.maxQuadsPerFrame;
     }
 
     /**
-     * Si nada entra en el presupuesto pero tampoco se generó nada todavía, se admite una región.
-     * Sin esto, un presupuesto de cuádruples demasiado ajustado dejaría el cielo vacío para
+     * Si nada entra en el presupuesto pero tampoco se genero nada todavia, se admite una region.
+     * Sin esto, un presupuesto de cuadruples demasiado ajustado dejaria el cielo vacio para
      * siempre en vez de llenarse despacio.
      */
     public boolean canGenerateAtLeastOne() {

@@ -6,18 +6,18 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL33;
 
 /**
- * Tiempo de GPU por frame mediante consultas de temporización de OpenGL.
+ * Tiempo de GPU por frame mediante consultas de temporizacion de OpenGL.
  *
- * El documento de diseño es explícito en esto (Sección 16.2): si el tiempo de GPU no se mide, hay
- * que registrar que no se midió, nunca estimarlo. Por eso {@link #isAvailable()} existe y por eso
- * el CSV distingue vacío de cero.
+ * El documento de diseno es explicito en esto (Seccion 16.2): si el tiempo de GPU no se mide, hay
+ * que registrar que no se midio, nunca estimarlo. Por eso {@link #isAvailable()} existe y por eso
+ * el CSV distingue vacio de cero.
  *
- * Las consultas son asíncronas: el resultado de un frame no está listo hasta varios frames
- * después. Leerlo de inmediato sincronizaría CPU y GPU y arruinaría justamente lo que se quiere
- * medir, así que se usa un anillo de consultas y se cosecha la más vieja cuando ya está lista.
+ * Las consultas son asincronas: el resultado de un frame no esta listo hasta varios frames
+ * despues. Leerlo de inmediato sincronizaria CPU y GPU y arruinaria justamente lo que se quiere
+ * medir, asi que se usa un anillo de consultas y se cosecha la mas vieja cuando ya esta lista.
  *
  * SIN VERIFICAR: nada de esto se pudo ejecutar. Los nombres de LWJGL son los esperables para
- * OpenGL 3.3, pero hay que confirmarlos contra la versión de LWJGL que trae 1.20.1.
+ * OpenGL 3.3, pero hay que confirmarlos contra la version de LWJGL que trae 1.20.1.
  */
 public final class GpuTimer {
 
@@ -45,7 +45,7 @@ public final class GpuTimer {
         return this.available;
     }
 
-    /** Abre la consulta del frame actual. Sin efecto si el anillo está lleno. */
+    /** Abre la consulta del frame actual. Sin efecto si el anillo esta lleno. */
     public void beginFrame() {
         if (!this.available || this.queryOpen || this.pending[this.writeIndex]) {
             return;
@@ -55,12 +55,12 @@ public final class GpuTimer {
     }
 
     /**
-     * Cierra la consulta del frame actual y cosecha la más vieja que ya esté disponible.
+     * Cierra la consulta del frame actual y cosecha la mas vieja que ya este disponible.
      *
-     * La cosecha ocurre siempre, haya o no consulta abierta. Cuando no era así, un anillo lleno
-     * dejaba el temporizador colgado para siempre: no se abría consulta, y sin consulta abierta
-     * tampoco se cosechaba, así que el anillo nunca se vaciaba. La primera medición real lo
-     * delató — el mismo valor de GPU repetido durante 1263 frames seguidos.
+     * La cosecha ocurre siempre, haya o no consulta abierta. Cuando no era asi, un anillo lleno
+     * dejaba el temporizador colgado para siempre: no se abria consulta, y sin consulta abierta
+     * tampoco se cosechaba, asi que el anillo nunca se vaciaba. La primera medicion real lo
+     * delato - el mismo valor de GPU repetido durante 1263 frames seguidos.
      */
     public void endFrame() {
         if (!this.available) {
@@ -76,7 +76,7 @@ public final class GpuTimer {
     }
 
     /**
-     * Último tiempo de GPU cosechado, en milisegundos, o NaN si todavía no hay ninguno.
+     * Ultimo tiempo de GPU cosechado, en milisegundos, o NaN si todavia no hay ninguno.
      * Corresponde a un frame anterior, no al actual: es el precio de no sincronizar.
      */
     public double lastResultMillis() {

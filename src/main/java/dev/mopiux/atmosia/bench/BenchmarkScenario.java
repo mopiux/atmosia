@@ -1,10 +1,10 @@
 package dev.mopiux.atmosia.bench;
 
 /**
- * Los nueve escenarios de prueba de la Sección 16 del documento de diseño.
+ * Los nueve escenarios de prueba de la Seccion 16 del documento de diseno.
  *
- * Cada escenario fija una altura relativa a la capa de nubes y un movimiento de cámara. La
- * combinación de ambos es lo que hace la medición repetible: misma trayectoria, misma duración,
+ * Cada escenario fija una altura relativa a la capa de nubes y un movimiento de camara. La
+ * combinacion de ambos es lo que hace la medicion repetible: misma trayectoria, misma duracion,
  * mismo punto de partida en cada corrida.
  */
 public enum BenchmarkScenario {
@@ -12,16 +12,16 @@ public enum BenchmarkScenario {
     /** Cielo despejado: referencia de costo cuando no hay nubes que dibujar. */
     CLEAR_SKY("clear_sky", Altitude.BELOW, Movement.STATIC, Coverage.CLEAR),
 
-    /** Máxima cobertura: el peor caso de relleno. */
+    /** Maxima cobertura: el peor caso de relleno. */
     FULL_COVERAGE("full_coverage", Altitude.BELOW, Movement.STATIC, Coverage.MAX),
 
-    /** Cámara quieta: aísla el costo de estado estable, sin generación ni streaming. */
+    /** Camara quieta: aisla el costo de estado estable, sin generacion ni streaming. */
     CAMERA_STILL("camera_still", Altitude.BELOW, Movement.STATIC, Coverage.DEFAULT),
 
-    /** Giro rápido: estresa el frustum culling y el orden de dibujo. */
+    /** Giro rapido: estresa el frustum culling y el orden de dibujo. */
     CAMERA_SPIN("camera_spin", Altitude.BELOW, Movement.ORBIT, Coverage.DEFAULT),
 
-    /** Vuelo rápido: estresa la generación, la caché y la cola de prioridad. */
+    /** Vuelo rapido: estresa la generacion, la cache y la cola de prioridad. */
     FAST_TRAVEL("fast_travel", Altitude.BELOW, Movement.FLIGHT, Coverage.DEFAULT),
 
     /** Cambio de altura: estresa el culling vertical y el fade. */
@@ -30,10 +30,10 @@ public enum BenchmarkScenario {
     /** Debajo de las nubes: el caso normal de juego. */
     BELOW_CLOUDS("below_clouds", Altitude.BELOW, Movement.STATIC, Coverage.DEFAULT),
 
-    /** Dentro de las nubes: el caso que más artefactos de transparencia produce. */
+    /** Dentro de las nubes: el caso que mas artefactos de transparencia produce. */
     INSIDE_CLOUDS("inside_clouds", Altitude.INSIDE, Movement.STATIC, Coverage.DEFAULT),
 
-    /** Encima de las nubes: máxima cantidad de geometría visible a la vez. */
+    /** Encima de las nubes: maxima cantidad de geometria visible a la vez. */
     ABOVE_CLOUDS("above_clouds", Altitude.ABOVE, Movement.STATIC, Coverage.DEFAULT);
 
     public enum Altitude { BELOW, INSIDE, ABOVE, SWEEP }
@@ -42,8 +42,8 @@ public enum BenchmarkScenario {
 
     /**
      * Cobertura de nubes deseada. CLEAR y MAX solo son aplicables cuando el renderer permite
-     * forzarla; con nubes vanilla no hay tal control, así que la corrida se marca en el CSV para
-     * que nadie compare peras con manzanas más adelante.
+     * forzarla; con nubes vanilla no hay tal control, asi que la corrida se marca en el CSV para
+     * que nadie compare peras con manzanas mas adelante.
      */
     public enum Coverage { DEFAULT, CLEAR, MAX }
 

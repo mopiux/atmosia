@@ -6,10 +6,10 @@ import dev.mopiux.atmosia.core.RegionKey;
 import javax.annotation.Nullable;
 
 /**
- * Geometría subida a GPU de una región y capa, con su estado de caché (Sección 5.2).
+ * Geometria subida a GPU de una region y capa, con su estado de cache (Seccion 5.2).
  *
- * El campo de densidad no se guarda después de construir la malla: se puede recalcular en
- * cualquier momento a partir de la seed, y guardarlo solo gastaría memoria. Lo que sí se conserva
+ * El campo de densidad no se guarda despues de construir la malla: se puede recalcular en
+ * cualquier momento a partir de la seed, y guardarlo solo gastaria memoria. Lo que si se conserva
  * es el buffer, porque reconstruirlo es lo caro.
  */
 public final class RegionMesh {
@@ -46,7 +46,7 @@ public final class RegionMesh {
         return this.quads;
     }
 
-    /** Una región puede quedar vacía: cielo despejado en esa zona. Se cachea igual. */
+    /** Una region puede quedar vacia: cielo despejado en esa zona. Se cachea igual. */
     public boolean isEmpty() {
         return this.buffer == null || this.quads == 0;
     }
@@ -59,7 +59,7 @@ public final class RegionMesh {
         this.lastUsedFrame = frame;
     }
 
-    /** Bytes aproximados en GPU: POSITION_COLOR son 16 por vértice, cuatro por cuádruple. */
+    /** Bytes aproximados en GPU: POSITION_COLOR son 16 por vertice, cuatro por cuadruple. */
     public long approximateGpuBytes() {
         return (long) this.quads * 4L * 16L;
     }

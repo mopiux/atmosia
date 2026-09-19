@@ -1,18 +1,18 @@
 package dev.mopiux.atmosia.core;
 
 /**
- * Campo de ruido determinista para la densidad de nubes (Sección 4 del documento de diseño).
+ * Campo de ruido determinista para la densidad de nubes (Seccion 4 del documento de diseno).
  *
- * Es ruido de valor con interpolación suave y varias octavas. No es el ruido más bonito que
+ * Es ruido de valor con interpolacion suave y varias octavas. No es el ruido mas bonito que
  * existe, y esa es la idea: el documento pide priorizar rendimiento sobre espectacularidad al
- * elegir la función. Se evalúa muchísimas veces por región, así que cada operación cuenta.
+ * elegir la funcion. Se evalua muchisimas veces por region, asi que cada operacion cuenta.
  *
  * Determinismo: la misma seed y las mismas coordenadas dan siempre el mismo valor, sin estado ni
- * tablas de permutación que inicializar. Volver a mirar una zona del cielo la muestra igual.
+ * tablas de permutacion que inicializar. Volver a mirar una zona del cielo la muestra igual.
  *
- * Precisión: el hash trabaja sobre coordenadas enteras de celda en long, no sobre floats de
- * coordenadas absolutas, así que no se degrada lejos del origen. Es la otra mitad de la estrategia
- * de floating origin: las regiones aportan coordenadas locales y el ruido nunca ve un número
+ * Precision: el hash trabaja sobre coordenadas enteras de celda en long, no sobre floats de
+ * coordenadas absolutas, asi que no se degrada lejos del origen. Es la otra mitad de la estrategia
+ * de floating origin: las regiones aportan coordenadas locales y el ruido nunca ve un numero
  * grande en punto flotante.
  */
 public final class NoiseField {
@@ -59,8 +59,8 @@ public final class NoiseField {
         double fx = x - cellX;
         double fz = z - cellZ;
 
-        // Suavizado hermite: la derivada se anula en los bordes de celda, así no se ven las
-        // costuras de la grilla como líneas rectas en el cielo.
+        // Suavizado hermite: la derivada se anula en los bordes de celda, asi no se ven las
+        // costuras de la grilla como lineas rectas en el cielo.
         double sx = fx * fx * (3.0D - 2.0D * fx);
         double sz = fz * fz * (3.0D - 2.0D * fz);
 
@@ -85,7 +85,7 @@ public final class NoiseField {
         h ^= h >>> 27;
         h *= 0x94D049BB133111EBL;
         h ^= h >>> 31;
-        // 53 bits en la mantisa de un double: usar más no aporta nada.
+        // 53 bits en la mantisa de un double: usar mas no aporta nada.
         return (h >>> 11) * 0x1.0p-53D;
     }
 

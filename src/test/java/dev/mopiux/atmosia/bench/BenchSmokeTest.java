@@ -3,11 +3,11 @@ package dev.mopiux.atmosia.bench;
 import java.util.Locale;
 
 /**
- * Comprobaciones de la parte del harness que no depende de Minecraft: estadísticas de frame,
- * formato del CSV y trayectorias de cámara.
+ * Comprobaciones de la parte del harness que no depende de Minecraft: estadisticas de frame,
+ * formato del CSV y trayectorias de camara.
  *
- * Es un {@code main} y no JUnit a propósito: corre sin dependencias ni Gradle, que es lo único
- * posible mientras el entorno no pueda descargar Forge. Desde la raíz del repositorio:
+ * Es un {@code main} y no JUnit a proposito: corre sin dependencias ni Gradle, que es lo unico
+ * posible mientras el entorno no pueda descargar Forge. Desde la raiz del repositorio:
  *
  * <pre>
  * javac --release 17 -d /tmp/atmosia-test \
@@ -19,7 +19,7 @@ import java.util.Locale;
  * java -cp /tmp/atmosia-test dev.mopiux.atmosia.bench.BenchSmokeTest
  * </pre>
  *
- * Sale con código 1 si algo falla, así que sirve tal cual en un script de CI.
+ * Sale con codigo 1 si algo falla, asi que sirve tal cual en un script de CI.
  */
 public final class BenchSmokeTest {
     static int fails = 0;
@@ -29,7 +29,7 @@ public final class BenchSmokeTest {
     }
 
     public static void main(String[] args) {
-        // 100 frames de 10 ms + 1 tirón de 100 ms: el caso que separa el 1% low del percentil 99.
+        // 100 frames de 10 ms + 1 tiron de 100 ms: el caso que separa el 1% low del percentil 99.
         FrameStats s = new FrameStats();
         for (int i = 0; i < 100; i++) s.add(10.0);
         s.add(100.0);

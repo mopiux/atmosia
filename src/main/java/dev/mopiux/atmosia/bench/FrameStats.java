@@ -5,8 +5,8 @@ import java.util.Arrays;
 /**
  * Acumulador de tiempos de frame.
  *
- * Guarda cada muestra en vez de promediar al vuelo, porque el 1% low —que es la métrica que
- * delata los tirones— necesita la distribución completa, no un promedio. A 300 FPS durante 60
+ * Guarda cada muestra en vez de promediar al vuelo, porque el 1% low -que es la metrica que
+ * delata los tirones- necesita la distribucion completa, no un promedio. A 300 FPS durante 60
  * segundos son 18.000 doubles: 144 KB, irrelevante.
  */
 public final class FrameStats {
@@ -45,7 +45,7 @@ public final class FrameStats {
     }
 
     /**
-     * Percentil por interpolación nearest-rank sobre una copia ordenada.
+     * Percentil por interpolacion nearest-rank sobre una copia ordenada.
      *
      * @param percentile entre 0 y 100. El p99 del tiempo de frame es el 1% low de FPS.
      */
@@ -66,12 +66,12 @@ public final class FrameStats {
     }
 
     /**
-     * 1% low: el FPS equivalente al promedio del 1% de frames más lentos.
+     * 1% low: el FPS equivalente al promedio del 1% de frames mas lentos.
      *
      * No es lo mismo que {@code 1000 / percentileMs(99)}, y la diferencia importa. El percentil 99
-     * por rango más cercano devuelve el valor en la posición 99%, que en una muestra de 101 frames
-     * con un solo tirón de 100 ms deja ese tirón afuera y reporta 100 FPS. El promedio del peor 1%
-     * —que es lo que reportan las herramientas de benchmarking cuando dicen "1% low"— lo captura y
+     * por rango mas cercano devuelve el valor en la posicion 99%, que en una muestra de 101 frames
+     * con un solo tiron de 100 ms deja ese tiron afuera y reporta 100 FPS. El promedio del peor 1%
+     * -que es lo que reportan las herramientas de benchmarking cuando dicen "1% low"- lo captura y
      * reporta 10 FPS. Medir tirones y no verlos es peor que no medirlos.
      */
     public double onePercentLowFps() {
@@ -80,7 +80,7 @@ public final class FrameStats {
     }
 
     /**
-     * Tiempo medio del {@code fraction} más lento de los frames, siempre sobre al menos uno.
+     * Tiempo medio del {@code fraction} mas lento de los frames, siempre sobre al menos uno.
      *
      * @param fraction entre 0 y 1. 0.01 es el 1% low.
      */

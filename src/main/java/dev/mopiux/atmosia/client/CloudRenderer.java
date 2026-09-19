@@ -31,15 +31,15 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 /**
- * Renderer de nubes: caché, LOD, culling, presupuesto y dibujo.
+ * Renderer de nubes: cache, LOD, culling, presupuesto y dibujo.
  *
- * El movimiento se resuelve con un desplazamiento y nunca regenerando geometría. Las regiones
- * viven en espacio de nube —coordenadas con el viento ya descontado— así que su densidad no cambia
- * jamás; lo único que cambia con el tiempo es dónde se dibujan y cuáles caen dentro del rango. Eso
- * satisface de una sola vez el requisito de movimiento de la Sección 10 y el de no regenerar de la
- * Sección 5.1.
+ * El movimiento se resuelve con un desplazamiento y nunca regenerando geometria. Las regiones
+ * viven en espacio de nube -coordenadas con el viento ya descontado- asi que su densidad no cambia
+ * jamas; lo unico que cambia con el tiempo es donde se dibujan y cuales caen dentro del rango. Eso
+ * satisface de una sola vez el requisito de movimiento de la Seccion 10 y el de no regenerar de la
+ * Seccion 5.1.
  *
- * SIN COMPILAR NI EJECUTAR. Los puntos donde la API de 1.20.1 hay que confirmarla están marcados
+ * SIN COMPILAR NI EJECUTAR. Los puntos donde la API de 1.20.1 hay que confirmarla estan marcados
  * con VERIFICAR.
  */
 public final class CloudRenderer implements CloudMetricsProvider {
@@ -48,10 +48,10 @@ public final class CloudRenderer implements CloudMetricsProvider {
     private final List<Entry> drawList = new ArrayList<>();
     private final GenerationQueue queue;
 
-    /** No es final: el perfil gráfico se cambia en caliente desde el menú. */
+    /** No es final: el perfil grafico se cambia en caliente desde el menu. */
     private CloudBudget budget;
 
-    /** Los valores con los que se construyó lo que hay en caché ahora mismo. */
+    /** Los valores con los que se construyo lo que hay en cache ahora mismo. */
     private QualityProfile.Settings appliedQuality;
     private double appliedCoverageScale;
     private final VerticalFade verticalFade = VerticalFade.defaults();
@@ -59,7 +59,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
     private final NoiseField noise;
     private final long seed;
 
-    /** Tope de resultados ya calculados esperando construcción. */
+    /** Tope de resultados ya calculados esperando construccion. */
     private static final int MAX_DEFERRED = 32;
 
     private final List<DensityJob.Result> deferred = new ArrayList<>();
@@ -88,12 +88,12 @@ public final class CloudRenderer implements CloudMetricsProvider {
     }
 
     /**
-     * Relee la configuración y reacciona a lo que haya cambiado desde el frame anterior.
+     * Relee la configuracion y reacciona a lo que haya cambiado desde el frame anterior.
      *
-     * La distinción importante es cuál de los dos ajustes obliga a tirar la caché. El perfil solo
-     * cambia qué nivel de detalle le toca a cada región, y eso el renderer ya lo detecta región por
-     * región y lo reemplaza sin huecos. La cantidad de nubes cambia la densidad misma: las mallas
-     * que ya están en memoria describen un cielo que ya no es el pedido, y no hay forma de saberlo
+     * La distincion importante es cual de los dos ajustes obliga a tirar la cache. El perfil solo
+     * cambia que nivel de detalle le toca a cada region, y eso el renderer ya lo detecta region por
+     * region y lo reemplaza sin huecos. La cantidad de nubes cambia la densidad misma: las mallas
+     * que ya estan en memoria describen un cielo que ya no es el pedido, y no hay forma de saberlo
      * mirando su clave. Esas hay que rehacerlas.
      */
     private void applyConfigChanges() {
@@ -110,7 +110,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
         }
     }
 
-    /** Tira toda la geometría cacheada. El cielo se vuelve a llenar con el presupuesto de siempre. */
+    /** Tira toda la geometria cacheada. El cielo se vuelve a llenar con el presupuesto de siempre. */
     private void flushGeometry() {
         for (RegionMesh mesh : this.cache.values()) {
             mesh.close();
@@ -127,9 +127,9 @@ public final class CloudRenderer implements CloudMetricsProvider {
     /**
      * Dibuja las nubes. Se llama una vez por frame desde el evento de render de nivel.
      *
-     * @param poseStack  pila de transformación del evento, con la cámara ya orientada
-     * @param projection matriz de proyección del frame
-     * @param frustum    frustum del frame, o null si no está disponible
+     * @param poseStack  pila de transformacion del evento, con la camara ya orientada
+     * @param projection matriz de proyeccion del frame
+     * @param frustum    frustum del frame, o null si no esta disponible
      */
     public void render(PoseStack poseStack, Matrix4f projection, Camera camera, ClientLevel level,
                        float partialTick, @Nullable Frustum frustum) {
@@ -141,7 +141,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
         this.lastDrawCalls = 0;
 
         // El tiempo del mundo, no el reloj del cliente: con el reloj del cliente las nubes saltan
-        // al reconectar, se desincronizan del ciclo día/noche y siguen avanzando en pausa.
+        // al reconectar, se desincronizan del ciclo dia/noche y siguen avanzando en pausa.
         double seconds = (level.getGameTime() + partialTick) / 20.0D;
         double speedScale = AtmosiaConfig.CLIENT.speedScale.get();
 
@@ -163,7 +163,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
     }
 
     /**
-     * Recorre las regiones candidatas, dibuja las que ya están y encola las que faltan.
+     * Recorre las regiones candidatas, dibuja las que ya estan y encola las que faltan.
      *
      * Se recorre por capa porque cada una tiene su propia deriva y, por lo tanto, su propia grilla
      * de regiones en espacio de nube.
@@ -186,12 +186,12 @@ public final class CloudRenderer implements CloudMetricsProvider {
             double cloudCameraX = cameraPos.x - windX;
             double cloudCameraZ = cameraPos.z - windZ;
 
-            // Posición proyectada: la misma que la real mientras no se vaya rápido.
+            // Posicion proyectada: la misma que la real mientras no se vaya rapido.
             double aheadX = cloudCameraX + this.prefetch.leadX();
             double aheadZ = cloudCameraZ + this.prefetch.leadZ();
 
-            // El barrido se agranda con el adelanto, si no no habría nada nuevo que encontrar
-            // adelante: las regiones que se quieren anticipar están, por definición, fuera del domo.
+            // El barrido se agranda con el adelanto, si no no habria nada nuevo que encontrar
+            // adelante: las regiones que se quieren anticipar estan, por definicion, fuera del domo.
             double scanRange = selector.maxDistance() + this.prefetch.leadLength();
             int radius = (int) Math.ceil(scanRange / RegionKey.REGION_SIZE) + 1;
             RegionKey center = RegionKey.of(layerIndex, cloudCameraX, cloudCameraZ);
@@ -204,9 +204,9 @@ public final class CloudRenderer implements CloudMetricsProvider {
                     double toZ = key.centerZ() - cloudCameraZ;
                     double distance = Math.sqrt(toX * toX + toZ * toZ);
 
-                    // Lo que se dibuja se decide con la posición real; lo que se genera, con la
-                    // proyectada. Adelantar también el dibujo movería el domo respecto de la
-                    // cámara y dejaría un borde a la vista por detrás.
+                    // Lo que se dibuja se decide con la posicion real; lo que se genera, con la
+                    // proyectada. Adelantar tambien el dibujo moveria el domo respecto de la
+                    // camara y dejaria un borde a la vista por detras.
                     double aheadDX = key.centerX() - aheadX;
                     double aheadDZ = key.centerZ() - aheadZ;
                     double aheadDistance = Math.sqrt(aheadDX * aheadDX + aheadDZ * aheadDZ);
@@ -217,10 +217,10 @@ public final class CloudRenderer implements CloudMetricsProvider {
                         continue;
                     }
                     // El nivel a construir es el que va a hacer falta al llegar. Si no se va a
-                    // ningún lado, los dos valen lo mismo y no cambia nada.
+                    // ningun lado, los dos valen lo mismo y no cambia nada.
                     LodLevel lod = wantedLod != null ? wantedLod : drawLod;
                     if (layerIndex >= lod.layers()) {
-                        // A distancia no se mantienen todas las capas (Sección 7.1): las de arriba
+                        // A distancia no se mantienen todas las capas (Seccion 7.1): las de arriba
                         // son las que menos se notan al desaparecer, por eso se van primero.
                         continue;
                     }
@@ -244,10 +244,10 @@ public final class CloudRenderer implements CloudMetricsProvider {
                         if (mesh.lod() == lod) {
                             continue;
                         }
-                        // El LOD cambió: se encola la nueva versión, pero se sigue dibujando la
-                        // vieja mientras tanto. Dejar de dibujarla abriría un agujero en el cielo
+                        // El LOD cambio: se encola la nueva version, pero se sigue dibujando la
+                        // vieja mientras tanto. Dejar de dibujarla abriria un agujero en el cielo
                         // justo al cruzar el umbral de distancia, que es el popping que la
-                        // Sección 7.1 pide evitar.
+                        // Seccion 7.1 pide evitar.
                     }
 
                     if (RegionPriority.shouldGenerate(priority) && !this.queue.isInFlight(key)) {
@@ -258,8 +258,8 @@ public final class CloudRenderer implements CloudMetricsProvider {
             }
         }
 
-        // Más urgente primero: lo que no entre hoy se reevalúa el frame que viene, ya con la
-        // prioridad actualizada a donde esté mirando el jugador.
+        // Mas urgente primero: lo que no entre hoy se reevalua el frame que viene, ya con la
+        // prioridad actualizada a donde este mirando el jugador.
         pending.sort((a, b) -> Long.compare(a.sortKey, b.sortKey));
         for (Pending item : pending) {
             if (this.queue.isSaturated()) {
@@ -274,9 +274,9 @@ public final class CloudRenderer implements CloudMetricsProvider {
     }
 
     /**
-     * VERIFICAR: la caja de la región en coordenadas de mundo debe coincidir con lo que espera el
-     * frustum de 1.20.1. Si la comprobación resulta incorrecta, el síntoma es que desaparezcan
-     * nubes que deberían verse al girar la cámara.
+     * VERIFICAR: la caja de la region en coordenadas de mundo debe coincidir con lo que espera el
+     * frustum de 1.20.1. Si la comprobacion resulta incorrecta, el sintoma es que desaparezcan
+     * nubes que deberian verse al girar la camara.
      */
     private boolean inFrustum(Frustum frustum, RegionKey key, CloudLayerDef layer, double windX, double windZ) {
         double minX = key.originX() + windX;
@@ -289,9 +289,9 @@ public final class CloudRenderer implements CloudMetricsProvider {
     /**
      * Construye mallas con los resultados listos, hasta agotar el presupuesto del frame.
      *
-     * Lo que no entra no se descarta: el cálculo de densidad ya está pagado, así que se guarda y
+     * Lo que no entra no se descarta: el calculo de densidad ya esta pagado, asi que se guarda y
      * se construye en el frame siguiente, antes que nada nuevo. Solo se tira si la lista de
-     * diferidos crece demasiado, y en ese caso la región se vuelve a calcular cuando haga falta.
+     * diferidos crece demasiado, y en ese caso la region se vuelve a calcular cuando haga falta.
      */
     private void consumeCompletedWithinBudget() {
         List<DensityJob.Result> carried = new ArrayList<>(this.deferred);
@@ -312,10 +312,10 @@ public final class CloudRenderer implements CloudMetricsProvider {
         }
     }
 
-    /** Construye una región si entra en el presupuesto. Si no entra, la difiere y devuelve false. */
+    /** Construye una region si entra en el presupuesto. Si no entra, la difiere y devuelve false. */
     private boolean tryBuild(DensityJob.Result result) {
         if (result.job().coverageScale() != this.appliedCoverageScale) {
-            // Se calculó con otra cantidad de nubes y llegó después del cambio. Construirla metería
+            // Se calculo con otra cantidad de nubes y llego despues del cambio. Construirla meteria
             // en el cielo un pedazo del cielo anterior; se descarta y se vuelve a pedir cuando haga
             // falta, que es en el mismo frame.
             return true;
@@ -371,8 +371,8 @@ public final class CloudRenderer implements CloudMetricsProvider {
             }
 
             poseStack.pushPose();
-            // VERIFICAR: en 1.20.1 la pila del evento viene sin la traslación de cámara aplicada,
-            // así que se resta acá. Si las nubes aparecen pegadas a la cámara o en el lugar
+            // VERIFICAR: en 1.20.1 la pila del evento viene sin la traslacion de camara aplicada,
+            // asi que se resta aca. Si las nubes aparecen pegadas a la camara o en el lugar
             // equivocado, este es el punto a revisar.
             poseStack.translate(
                     entry.mesh().key().originX() + entry.offsetX() - cameraPos.x,
@@ -398,18 +398,18 @@ public final class CloudRenderer implements CloudMetricsProvider {
         AtmosiaRenderType.CLOUDS.clearRenderState();
     }
 
-    /** Brillo extra cuando se mira hacia el sol (Sección 11.2). */
+    /** Brillo extra cuando se mira hacia el sol (Seccion 11.2). */
     private float forwardScatter(ClientLevel level, Camera camera, float partialTick) {
         double sunAngle = level.getSunAngle(partialTick);
         Vector3f look = camera.getLookVector();
-        // El sol recorre el plano XY: basta su dirección proyectada contra la vista.
+        // El sol recorre el plano XY: basta su direccion proyectada contra la vista.
         double sunX = -Math.sin(sunAngle);
         double sunY = Math.cos(sunAngle);
         double dot = look.x() * sunX + look.y() * sunY;
         return DensityField.forwardScatter(dot);
     }
 
-    /** Descarta lo más viejo cuando la caché pasa su tamaño máximo (Sección 5.2). */
+    /** Descarta lo mas viejo cuando la cache pasa su tamano maximo (Seccion 5.2). */
     private void evict() {
         int excess = this.cache.size() - this.budget.maxCachedRegions();
         if (excess <= 0) {
@@ -424,7 +424,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
         }
     }
 
-    /** Libera todo. Al cambiar de mundo o de configuración. */
+    /** Libera todo. Al cambiar de mundo o de configuracion. */
     public void close() {
         this.prefetch.reset();
         this.queue.shutdown();
@@ -432,7 +432,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
     }
 
     // -------------------------------------------------------------------------------------
-    // Métricas para el harness de benchmark
+    // Metricas para el harness de benchmark
     // -------------------------------------------------------------------------------------
 
     @Override
@@ -462,7 +462,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
 
     @Override
     public long cacheBytes() {
-        // La densidad no se conserva tras construir la malla, así que la caché en memoria
+        // La densidad no se conserva tras construir la malla, asi que la cache en memoria
         // principal es solo la contabilidad de las entradas.
         return (long) this.cache.size() * 64L;
     }

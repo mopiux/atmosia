@@ -1,18 +1,18 @@
 package dev.mopiux.atmosia.bench;
 
 /**
- * Trayectoria determinista de cámara.
+ * Trayectoria determinista de camara.
  *
- * La posición y los ángulos son función del tiempo transcurrido en segundos, nunca del número de
- * frame: así la misma corrida recorre exactamente el mismo camino en una máquina que rinde 30 FPS
+ * La posicion y los angulos son funcion del tiempo transcurrido en segundos, nunca del numero de
+ * frame: asi la misma corrida recorre exactamente el mismo camino en una maquina que rinde 30 FPS
  * y en una que rinde 300, que es lo que hace comparables las mediciones entre fases.
  */
 public final class CameraPath {
 
     /**
      * Altura de la capa de nubes vanilla en el Overworld.
-     * VERIFICAR: confirmar el valor real en 1.20.1 (efectos de dimensión del Overworld) y, más
-     * adelante, leerlo de la configuración de Atmosia en vez de dejarlo fijo acá.
+     * VERIFICAR: confirmar el valor real en 1.20.1 (efectos de dimension del Overworld) y, mas
+     * adelante, leerlo de la configuracion de Atmosia en vez de dejarlo fijo aca.
      */
     public static final double VANILLA_CLOUD_HEIGHT = 192.0D;
 
@@ -27,10 +27,10 @@ public final class CameraPath {
     /** Grados por segundo del giro. 90 equivale a una vuelta completa cada cuatro segundos. */
     private static final double ORBIT_DEGREES_PER_SECOND = 90.0D;
 
-    /** Bloques por segundo del tramo de vuelo. Aproxima el ritmo de unos élitros. */
+    /** Bloques por segundo del tramo de vuelo. Aproxima el ritmo de unos elitros. */
     private static final double FLIGHT_BLOCKS_PER_SECOND = 40.0D;
 
-    /** Amplitud y período del barrido vertical. */
+    /** Amplitud y periodo del barrido vertical. */
     private static final double SWEEP_AMPLITUDE = 70.0D;
     private static final double SWEEP_PERIOD_SECONDS = 8.0D;
 
@@ -45,7 +45,7 @@ public final class CameraPath {
         this.cloudHeight = cloudHeight;
     }
 
-    /** Pose de la cámara a los {@code seconds} segundos de iniciada la trayectoria. */
+    /** Pose de la camara a los {@code seconds} segundos de iniciada la trayectoria. */
     public Pose poseAt(double seconds) {
         double baseY = this.baseAltitude();
         double x = ORIGIN_X;
@@ -60,7 +60,7 @@ public final class CameraPath {
             }
             case ORBIT -> yaw = (float) wrapDegrees(seconds * ORBIT_DEGREES_PER_SECOND);
             case FLIGHT -> {
-                // Vuelo recto mirando hacia adelante: estresa generación y caché, no el culling.
+                // Vuelo recto mirando hacia adelante: estresa generacion y cache, no el culling.
                 x = ORIGIN_X + seconds * FLIGHT_BLOCKS_PER_SECOND;
                 yaw = 90.0F;
             }

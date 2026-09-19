@@ -15,24 +15,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Corrida de benchmark: máquina de estados que fija las condiciones, recorre una trayectoria
+ * Corrida de benchmark: maquina de estados que fija las condiciones, recorre una trayectoria
  * determinista, acumula tiempos y escribe el resultado.
  *
- * Implementa la Sección 16.2 del documento de diseño. El orden importa:
- * condiciones fijas → calentamiento descartado → ventana de medición → restaurar todo.
+ * Implementa la Seccion 16.2 del documento de diseno. El orden importa:
+ * condiciones fijas -> calentamiento descartado -> ventana de medicion -> restaurar todo.
  *
- * SIN COMPILAR NI EJECUTAR: el entorno donde se escribió no tiene Minecraft ni Forge. Los puntos
- * donde la API de 1.20.1 hay que confirmarla están marcados con VERIFICAR.
+ * SIN COMPILAR NI EJECUTAR: el entorno donde se escribio no tiene Minecraft ni Forge. Los puntos
+ * donde la API de 1.20.1 hay que confirmarla estan marcados con VERIFICAR.
  */
 public final class BenchmarkRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("atmosia-bench");
     private static final BenchmarkRunner INSTANCE = new BenchmarkRunner();
 
-    /** Segundos descartados al principio: caché fría y shaders sin compilar mienten. */
+    /** Segundos descartados al principio: cache fria y shaders sin compilar mienten. */
     private static final double DEFAULT_WARMUP_SECONDS = 5.0D;
 
-    /** Duración de la ventana de medición. */
+    /** Duracion de la ventana de medicion. */
     private static final double DEFAULT_DURATION_SECONDS = 30.0D;
 
     private enum State { IDLE, WARMUP, RECORDING }
@@ -92,8 +92,8 @@ public final class BenchmarkRunner {
         this.lastFrameStartNanos = 0L;
 
         say(mc, "Benchmark iniciado: " + scenario.id()
-                + " (calentamiento " + warmup + " s, medición " + duration + " s)"
-                + (this.gpuTimer.isAvailable() ? "" : " — sin medición de GPU en este driver"));
+                + " (calentamiento " + warmup + " s, medicion " + duration + " s)"
+                + (this.gpuTimer.isAvailable() ? "" : " - sin medicion de GPU en este driver"));
         return true;
     }
 
@@ -112,14 +112,14 @@ public final class BenchmarkRunner {
     // Por frame
     // -------------------------------------------------------------------------------------
 
-    /** Comienzo del frame: mueve la cámara y abre la consulta de GPU. */
+    /** Comienzo del frame: mueve la camara y abre la consulta de GPU. */
     public void onFrameStart() {
         if (!this.isRunning()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) {
-            this.abort("el mundo dejó de estar cargado");
+            this.abort("el mundo dejo de estar cargado");
             return;
         }
 
@@ -143,7 +143,7 @@ public final class BenchmarkRunner {
         this.lastFrameStartNanos = now;
     }
 
-    /** Fin del frame: cierra la consulta de GPU y evalúa las transiciones de estado. */
+    /** Fin del frame: cierra la consulta de GPU y evalua las transiciones de estado. */
     public void onFrameEnd() {
         if (!this.isRunning()) {
             return;
@@ -174,7 +174,7 @@ public final class BenchmarkRunner {
 
         if (this.cpuStats.isEmpty()) {
             this.disposeTimer();
-            say(mc, "Benchmark terminado sin muestras. Algo salió mal.");
+            say(mc, "Benchmark terminado sin muestras. Algo salio mal.");
             return;
         }
 
@@ -189,7 +189,7 @@ public final class BenchmarkRunner {
                     this.cpuStats.meanMs(), summary));
         } catch (IOException e) {
             LOGGER.error("No se pudo escribir el resultado del benchmark", e);
-            say(mc, "Benchmark terminado, pero falló la escritura del CSV: " + e.getMessage());
+            say(mc, "Benchmark terminado, pero fallo la escritura del CSV: " + e.getMessage());
         }
         this.disposeTimer();
     }
@@ -200,7 +200,7 @@ public final class BenchmarkRunner {
 
     /**
      * Fija lo que tiene que ser igual en cada corrida. Sin esto, dos mediciones no son
-     * comparables y el criterio de aceptación no significa nada.
+     * comparables y el criterio de aceptacion no significa nada.
      *
      * VERIFICAR: los nombres de las opciones y de sendCommand contra la API real de 1.20.1.
      */
@@ -208,14 +208,14 @@ public final class BenchmarkRunner {
         this.savedVsync = mc.options.enableVsync().get();
         this.savedFramerateLimit = mc.options.framerateLimit().get();
 
-        // Con VSync o con límite de FPS, el número de FPS mide el monitor, no el renderer.
+        // Con VSync o con limite de FPS, el numero de FPS mide el monitor, no el renderer.
         mc.options.enableVsync().set(false);
         mc.options.framerateLimit().set(260);
         mc.options.save();
 
         LocalPlayer player = mc.player;
         if (player != null && player.connection != null) {
-            // Espectador: sin colisión ni física, la posición impuesta por la trayectoria se
+            // Espectador: sin colision ni fisica, la posicion impuesta por la trayectoria se
             // respeta en vez de pelearse con el servidor.
             player.connection.sendCommand("gamemode spectator");
             player.connection.sendCommand("gamerule doDaylightCycle false");

@@ -59,3 +59,15 @@ jar {
         ])
     }
 }
+
+// El codigo fuente del mod es ASCII puro a proposito, pero fijar la codificacion igual: sin esto
+// javac usa la del sistema, que en un Windows en espanol es windows-1252, y cualquier caracter no
+// ASCII que entre en el futuro llegaria al juego convertido en otro. Fue un error real: los
+// acentos del menu se veian como simbolos sueltos.
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(ProcessResources).configureEach {
+    filteringCharset = 'UTF-8'
+}

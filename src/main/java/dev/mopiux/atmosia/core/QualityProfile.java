@@ -1,25 +1,25 @@
 package dev.mopiux.atmosia.core;
 
 /**
- * Perfiles gráficos: tres combinaciones probadas, más una manual.
+ * Perfiles graficos: tres combinaciones probadas, mas una manual.
  *
- * El documento de diseño deja todos los parámetros de rendimiento configurables uno por uno
- * (Sección 13.2), que está bien para medir pero no para jugar: nadie que quiera que le ande el mod
- * sabe qué es un presupuesto de cuádruples por frame. Un perfil es una combinación de esos valores
- * que ya se movieron juntos en la dirección correcta.
+ * El documento de diseno deja todos los parametros de rendimiento configurables uno por uno
+ * (Seccion 13.2), que esta bien para medir pero no para jugar: nadie que quiera que le ande el mod
+ * sabe que es un presupuesto de cuadruples por frame. Un perfil es una combinacion de esos valores
+ * que ya se movieron juntos en la direccion correcta.
  *
- * Los tres perfiles se mueven en los dos ejes que de verdad cuestan, y en ninguno más:
+ * Los tres perfiles se mueven en los dos ejes que de verdad cuestan, y en ninguno mas:
  *
  * <ul>
- *   <li><b>Cortes por capa</b> (el tope de detalle). Es relleno puro: cada corte es una capa más de
- *       transparencia sobre los mismos píxeles. Es lo primero que hay que bajar en una placa
- *       modesta, y lo último que se nota mirando el cielo.</li>
+ *   <li><b>Cortes por capa</b> (el tope de detalle). Es relleno puro: cada corte es una capa mas de
+ *       transparencia sobre los mismos pixeles. Es lo primero que hay que bajar en una placa
+ *       modesta, y lo ultimo que se nota mirando el cielo.</li>
  *   <li><b>Alcance del domo</b>. Cuesta regiones, memoria y draw calls, y crece con el cuadrado de
  *       la distancia.</li>
  * </ul>
  *
- * Lo que <em>no</em> cambia entre perfiles es el tamaño de celda: una celda grande se lee como un
- * rectángulo en el cielo por lejos que esté, y ese es un defecto visual, no un ajuste de calidad.
+ * Lo que <em>no</em> cambia entre perfiles es el tamano de celda: una celda grande se lee como un
+ * rectangulo en el cielo por lejos que este, y ese es un defecto visual, no un ajuste de calidad.
  */
 public enum QualityProfile {
 
@@ -32,8 +32,8 @@ public enum QualityProfile {
     HIGH("Alto", "Detalle completo y domo largo. Pide una placa dedicada.",
             new Settings(4.5D, LodLevel.HIGH, 4, 64_000, 768)),
 
-    /** Los valores sueltos del archivo de configuración, para medir y para quien quiera afinarlos. */
-    CUSTOM("Personalizado", "Usa los valores sueltos del archivo de configuración.", null);
+    /** Los valores sueltos del archivo de configuracion, para medir y para quien quiera afinarlos. */
+    CUSTOM("Personalizado", "Usa los valores sueltos del archivo de configuracion.", null);
 
     private final String displayName;
     private final String description;
@@ -53,7 +53,7 @@ public enum QualityProfile {
         return this.description;
     }
 
-    /** Si este perfil deja mandar a los valores sueltos de la configuración. */
+    /** Si este perfil deja mandar a los valores sueltos de la configuracion. */
     public boolean usesConfigValues() {
         return this.settings == null;
     }
@@ -71,10 +71,10 @@ public enum QualityProfile {
      * Valores de rendimiento ya resueltos.
      *
      * @param distanceMultiplier multiplicador sobre el render distance del jugador
-     * @param detailCap          nivel de detalle máximo permitido, aunque la distancia dé para más
+     * @param detailCap          nivel de detalle maximo permitido, aunque la distancia de para mas
      * @param regionsPerFrame    regiones subidas a GPU por frame
-     * @param quadsPerFrame      cuádruples construidos por frame
-     * @param maxCachedRegions   regiones vivas en caché
+     * @param quadsPerFrame      cuadruples construidos por frame
+     * @param maxCachedRegions   regiones vivas en cache
      */
     public record Settings(double distanceMultiplier, LodLevel detailCap, int regionsPerFrame,
                            int quadsPerFrame, int maxCachedRegions) {

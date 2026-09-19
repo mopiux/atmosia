@@ -1,14 +1,14 @@
 package dev.mopiux.atmosia.core;
 
 /**
- * Qué nubes se dibujan. Es el interruptor principal del mod.
+ * Que nubes se dibujan. Es el interruptor principal del mod.
  *
  * Son tres estados y no un booleano porque "apagar Atmosia" es ambiguo: puede querer decir
  * "devolveme las de siempre" o "no quiero ninguna nube". Con un solo booleano el jugador no puede
- * pedir la segunda, y nosotros no podemos distinguir un fallo de supresión de un cielo vacío.
+ * pedir la segunda, y nosotros no podemos distinguir un fallo de supresion de un cielo vacio.
  *
- * El modo NINGUNA además sirve de diagnóstico: si con él quedan nubes en el cielo, son vanilla y la
- * supresión no funcionó. Es la única forma de responder esa pregunta sin leer el log.
+ * El modo NINGUNA ademas sirve de diagnostico: si con el quedan nubes en el cielo, son vanilla y la
+ * supresion no funciono. Es la unica forma de responder esa pregunta sin leer el log.
  */
 public enum CloudMode {
 
@@ -37,7 +37,7 @@ public enum CloudMode {
         return this.description;
     }
 
-    /** Si Atmosia tiene que construir y dibujar geometría. */
+    /** Si Atmosia tiene que construir y dibujar geometria. */
     public boolean drawsAtmosia() {
         return this == ATMOSIA;
     }

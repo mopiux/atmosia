@@ -16,13 +16,13 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
 /**
- * Menú de configuración de Atmosia, el que abre el botón "Configuración" de la lista de mods.
+ * Menu de configuracion de Atmosia, el que abre el boton "Configuracion" de la lista de mods.
  *
  * Tiene tres controles y un panel de estado, y el panel no es decorativo: la primera prueba real del
- * mod terminó en una discusión que nadie podía zanjar —si las nubes que se veían eran las vanilla o
- * las nuestras— porque la única forma de saberlo era leer el log. Acá el ajuste de nubes del juego
- * está a la vista, y el modo "Ninguna" deja el cielo completamente vacío: si con ese modo queda
- * alguna nube, es vanilla y la supresión falló. Eso es una respuesta, no una impresión.
+ * mod termino en una discusion que nadie podia zanjar -si las nubes que se veian eran las vanilla o
+ * las nuestras- porque la unica forma de saberlo era leer el log. Aca el ajuste de nubes del juego
+ * esta a la vista, y el modo "Ninguna" deja el cielo completamente vacio: si con ese modo queda
+ * alguna nube, es vanilla y la supresion fallo. Eso es una respuesta, no una impresion.
  */
 public final class AtmosiaConfigScreen extends Screen {
 
@@ -35,7 +35,7 @@ public final class AtmosiaConfigScreen extends Screen {
     private static final int COLOR_WARN = 0xFFAA00;
     private static final int COLOR_VALUE = 0xE0E0E0;
 
-    /** Rango del multiplicador de cobertura, el mismo que acepta la configuración. */
+    /** Rango del multiplicador de cobertura, el mismo que acepta la configuracion. */
     private static final double COVERAGE_MIN = 0.2D;
     private static final double COVERAGE_MAX = 2.0D;
 
@@ -101,13 +101,13 @@ public final class AtmosiaConfigScreen extends Screen {
 
     /**
      * La cantidad se muestra en porcentaje y no como multiplicador: "130%" se entiende sin saber
-     * qué es la cobertura de una capa, y "1,3x" no.
+     * que es la cobertura de una capa, y "1,3x" no.
      */
     private static String formatCoverage(double value) {
         return String.format(Locale.ROOT, "%d%%", Math.round(value * 100.0D));
     }
 
-    /** Dos decimales: el archivo de configuración no necesita el ruido del punto flotante. */
+    /** Dos decimales: el archivo de configuracion no necesita el ruido del punto flotante. */
     private static double round(double value) {
         return Math.round(value * 100.0D) / 100.0D;
     }
@@ -132,7 +132,7 @@ public final class AtmosiaConfigScreen extends Screen {
         y += ROW_SPACING;
         graphics.drawString(this.font, this.profile.description(), x, y + ROW_HEIGHT + 4, COLOR_HINT, false);
         y += ROW_SPACING;
-        graphics.drawString(this.font, "Cuánto cielo tapan las nubes. Cambiarla rehace el cielo.",
+        graphics.drawString(this.font, "Que parte del cielo tapan. Al cambiarla, el cielo se rehace.",
                 x, y + ROW_HEIGHT + 4, COLOR_HINT, false);
         y += ROW_SPACING;
 
@@ -140,7 +140,7 @@ public final class AtmosiaConfigScreen extends Screen {
         this.renderStatus(graphics, x, y + 6);
     }
 
-    /** Panel de estado: lo que está pasando de verdad, no lo que la configuración pide. */
+    /** Panel de estado: lo que esta pasando de verdad, no lo que la configuracion pide. */
     private void renderStatus(GuiGraphics graphics, int x, int y) {
         graphics.drawString(this.font, Component.literal("Estado"), x, y, COLOR_LABEL, false);
         y += 14;
@@ -148,7 +148,7 @@ public final class AtmosiaConfigScreen extends Screen {
         String standDown = AtmosiaClient.standDownReason();
         if (standDown != null) {
             graphics.drawString(this.font,
-                    Component.literal("Atmosia cedió el cielo: " + standDown),
+                    Component.literal("Atmosia dejo el cielo a otro mod: " + standDown),
                     x, y, COLOR_WARN, false);
             return;
         }
@@ -163,31 +163,31 @@ public final class AtmosiaConfigScreen extends Screen {
 
         CloudRenderer renderer = AtmosiaClient.renderer();
         String drawing = renderer == null
-                ? "Atmosia no está dibujando"
-                : "Atmosia dibujando · " + renderer.activeRegions() + " regiones en memoria";
+                ? "Atmosia no esta dibujando"
+                : "Atmosia dibujando - " + renderer.activeRegions() + " regiones en memoria";
         graphics.drawString(this.font, Component.literal(drawing), x, y, COLOR_VALUE, false);
         y += 11;
 
         int reapplied = VanillaCloudSuppressor.reapplyCount();
         if (reapplied > 0) {
             graphics.drawString(this.font,
-                    Component.literal("Algo reactivó las nubes del juego " + reapplied
-                            + " veces; Atmosia las volvió a apagar."),
+                    Component.literal("Algo volvio a encender las nubes del juego " + reapplied
+                            + " veces; Atmosia las volvio a apagar."),
                     x, y, COLOR_WARN, false);
             y += 11;
         }
 
         if (this.mode == CloudMode.NONE) {
             graphics.drawString(this.font,
-                    Component.literal("Si con este modo ves nubes, son vanilla y la supresión falló."),
+                    Component.literal("Si con este modo ves nubes, son vanilla y la supresion fallo."),
                     x, y, COLOR_HINT, false);
         }
     }
 
     @Override
     public void onClose() {
-        // Las flechas del teclado mueven el deslizador sin que haya un soltar del ratón, así que el
-        // último valor podría no estar confirmado todavía.
+        // Las flechas del teclado mueven el deslizador sin que haya un soltar del raton, asi que el
+        // ultimo valor podria no estar confirmado todavia.
         if (this.coverageSlider != null) {
             this.coverageSlider.commit();
         }
@@ -198,7 +198,7 @@ public final class AtmosiaConfigScreen extends Screen {
 
     @Override
     public boolean isPauseScreen() {
-        // Sin pausa: el mundo sigue corriendo detrás del menú, atenuado pero visible, así que un
+        // Sin pausa: el mundo sigue corriendo detras del menu, atenuado pero visible, asi que un
         // cambio de cantidad o de perfil se ve sin tener que salir y volver a entrar.
         return false;
     }

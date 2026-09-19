@@ -7,35 +7,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Suprime las nubes vanilla sin mixin (Sección 13.1 del documento de diseño).
+ * Suprime las nubes vanilla sin mixin (Seccion 13.1 del documento de diseno).
  *
  * El riesgo principal del proyecto no es de rendimiento sino de compatibilidad: cualquier hook
- * sobre LevelRenderer choca con shader packs y mods de optimización. Esta vía no toca LevelRenderer
- * ni comparte punto de inyección con nadie: apaga el ajuste de nubes del propio juego mientras
+ * sobre LevelRenderer choca con shader packs y mods de optimizacion. Esta via no toca LevelRenderer
+ * ni comparte punto de inyeccion con nadie: apaga el ajuste de nubes del propio juego mientras
  * Atmosia dibuja, y lo devuelve como estaba al desactivarse.
  *
- * <h2>Por qué no se usa la ruta de efectos de dimensión</h2>
+ * <h2>Por que no se usa la ruta de efectos de dimension</h2>
  *
- * La primera versión intentaba sustituir los efectos del Overworld por unos que declaran una altura
- * de nubes inválida, que es como el Nether y el End no dibujan nubes. No funcionó: ClientLevel
+ * La primera version intentaba sustituir los efectos del Overworld por unos que declaran una altura
+ * de nubes invalida, que es como el Nether y el End no dibujan nubes. No funciono: ClientLevel
  * resuelve su DimensionSpecialEffects una sola vez, al construirse, y se queda con esa instancia.
- * Sustituir la entrada del mapa después de que el mundo ya existe no cambia nada, y Atmosia se
- * entera del mundo justo después de que carga.
+ * Sustituir la entrada del mapa despues de que el mundo ya existe no cambia nada, y Atmosia se
+ * entera del mundo justo despues de que carga.
  *
- * <h2>Por qué se reaplica cada tick</h2>
+ * <h2>Por que se reaplica cada tick</h2>
  *
- * La segunda versión apagaba el ajuste una sola vez, al activarse, y el jugador siguió viendo nubes
- * vanilla. Aplicar una vez y confiar deja demasiadas formas de perder el ajuste: el menú de opciones
+ * La segunda version apagaba el ajuste una sola vez, al activarse, y el jugador siguio viendo nubes
+ * vanilla. Aplicar una vez y confiar deja demasiadas formas de perder el ajuste: el menu de opciones
  * lo reescribe al cerrarse, un archivo de opciones que se recarga lo devuelve a su valor guardado,
- * y cualquier otro mod que lo toque gana por ser el último. Ninguna de esas se puede prevenir desde
- * acá, pero todas se pueden corregir: {@link #enforce()} corre una vez por tick, comprueba el valor
- * real y lo vuelve a poner si alguien lo movió. Cuesta una comparación de enums por tick.
+ * y cualquier otro mod que lo toque gana por ser el ultimo. Ninguna de esas se puede prevenir desde
+ * aca, pero todas se pueden corregir: {@link #enforce()} corre una vez por tick, comprueba el valor
+ * real y lo vuelve a poner si alguien lo movio. Cuesta una comparacion de enums por tick.
  */
 public final class VanillaCloudSuppressor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("atmosia");
 
-    /** El ajuste que tenía el jugador antes de que Atmosia lo tocara, para devolvérselo. */
+    /** El ajuste que tenia el jugador antes de que Atmosia lo tocara, para devolverselo. */
     @Nullable
     private static CloudStatus savedStatus;
 
@@ -55,18 +55,18 @@ public final class VanillaCloudSuppressor {
         return installed ? "clouds-option-off" : "none";
     }
 
-    /** El ajuste de nubes que el juego tiene ahora mismo, para mostrarlo en el menú. */
+    /** El ajuste de nubes que el juego tiene ahora mismo, para mostrarlo en el menu. */
     public static CloudStatus currentGameSetting() {
         return Minecraft.getInstance().options.cloudStatus().get();
     }
 
-    /** El ajuste que el jugador tenía antes de que Atmosia lo tocara. */
+    /** El ajuste que el jugador tenia antes de que Atmosia lo tocara. */
     @Nullable
     public static CloudStatus savedSetting() {
         return savedStatus;
     }
 
-    /** Cuántas veces hubo que reaplicar el ajuste porque alguien lo movió. Diagnóstico. */
+    /** Cuantas veces hubo que reaplicar el ajuste porque alguien lo movio. Diagnostico. */
     public static int reapplyCount() {
         return reapplyCount;
     }
@@ -74,9 +74,9 @@ public final class VanillaCloudSuppressor {
     /**
      * Apaga las nubes vanilla y recuerda el valor original.
      *
-     * A diferencia de la versión anterior, no le da a un ajuste del juego el poder de desactivar el
-     * mod: el jugador tiene ahora un interruptor propio en el menú de Atmosia, con tres estados, y
-     * ese es el que manda. Si tenía las nubes en OFF, se guarda ese OFF y se le devuelve intacto al
+     * A diferencia de la version anterior, no le da a un ajuste del juego el poder de desactivar el
+     * mod: el jugador tiene ahora un interruptor propio en el menu de Atmosia, con tres estados, y
+     * ese es el que manda. Si tenia las nubes en OFF, se guarda ese OFF y se le devuelve intacto al
      * desactivar el mod; mientras tanto, Atmosia dibuja.
      */
     public static void install() {
@@ -92,7 +92,7 @@ public final class VanillaCloudSuppressor {
     }
 
     /**
-     * Vuelve a poner el ajuste en OFF si alguien lo movió. Una vez por tick.
+     * Vuelve a poner el ajuste en OFF si alguien lo movio. Una vez por tick.
      *
      * @return true si hubo que corregirlo en este tick
      */
@@ -107,7 +107,7 @@ public final class VanillaCloudSuppressor {
         apply(mc);
         reapplyCount++;
         if (reapplyCount == 1 || reapplyCount % 200 == 0) {
-            LOGGER.info("El ajuste de nubes del juego volvió a encenderse y se apagó de nuevo "
+            LOGGER.info("El ajuste de nubes del juego volvio a encenderse y se apago de nuevo "
                     + "({} veces). Atmosia dibuja las suyas.", reapplyCount);
         }
         return true;
@@ -129,7 +129,7 @@ public final class VanillaCloudSuppressor {
 
     private static void apply(Minecraft mc) {
         mc.options.cloudStatus().set(CloudStatus.OFF);
-        // Guardar en disco además de en memoria: sin esto, el menú de opciones puede recargar el
+        // Guardar en disco ademas de en memoria: sin esto, el menu de opciones puede recargar el
         // archivo y devolver el valor viejo, que es una de las formas de perder el ajuste.
         mc.options.save();
     }

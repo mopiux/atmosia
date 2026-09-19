@@ -1,10 +1,10 @@
 package dev.mopiux.atmosia.core;
 
 /**
- * Prioridad de generación de una región (Sección 8.1).
+ * Prioridad de generacion de una region (Seccion 8.1).
  *
- * Reproduce la tabla del documento: visible y cerca primero, fuera de cámara último. El número es
- * menor cuanto más urgente, para poder ordenarlo de forma natural.
+ * Reproduce la tabla del documento: visible y cerca primero, fuera de camara ultimo. El numero es
+ * menor cuanto mas urgente, para poder ordenarlo de forma natural.
  */
 public final class RegionPriority {
 
@@ -18,12 +18,12 @@ public final class RegionPriority {
     }
 
     /**
-     * Clasifica una región.
+     * Clasifica una region.
      *
-     * @param distance  distancia de la cámara al centro de la región
-     * @param selector  escala de LOD vigente, que define qué es cerca y qué es lejos
+     * @param distance  distancia de la camara al centro de la region
+     * @param selector  escala de LOD vigente, que define que es cerca y que es lejos
      * @param inFrustum si el frustum culling la considera visible
-     * @param dotFacing producto punto entre la dirección de vista y la dirección a la región
+     * @param dotFacing producto punto entre la direccion de vista y la direccion a la region
      */
     public static int classify(double distance, LodSelector selector, boolean inFrustum, double dotFacing) {
         if (!inFrustum) {
@@ -41,7 +41,7 @@ public final class RegionPriority {
     }
 
     /**
-     * Clave de orden dentro de la cola: primero la clase, y dentro de cada clase la más cercana.
+     * Clave de orden dentro de la cola: primero la clase, y dentro de cada clase la mas cercana.
      * Mezclar ambas cosas en un solo long evita comparar dos veces al ordenar.
      */
     public static long sortKey(int priorityClass, double distance) {
@@ -49,7 +49,7 @@ public final class RegionPriority {
         return ((long) priorityClass << 32) | distanceBits;
     }
 
-    /** Si vale la pena generar una región de esta clase. Fuera de cámara no se genera. */
+    /** Si vale la pena generar una region de esta clase. Fuera de camara no se genera. */
     public static boolean shouldGenerate(int priorityClass) {
         return priorityClass <= BEHIND_PLAYER;
     }

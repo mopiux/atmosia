@@ -1,42 +1,42 @@
 package dev.mopiux.atmosia.core;
 
 /**
- * Anticipa hacia dónde va la cámara, para generar antes las regiones que va a necesitar.
+ * Anticipa hacia donde va la camara, para generar antes las regiones que va a necesitar.
  *
- * La cola de prioridad ordena por distancia a la posición <em>actual</em>. A pie eso alcanza: se
- * camina a 4-5 bloques por segundo y una región mide 256, así que hay un minuto largo de margen.
+ * La cola de prioridad ordena por distancia a la posicion <em>actual</em>. A pie eso alcanza: se
+ * camina a 4-5 bloques por segundo y una region mide 256, asi que hay un minuto largo de margen.
  * Con elytra a 40-60 b/s el margen se achica, y la cola no se entera de que va a necesitar una
- * región hasta que el jugador ya está sobre ella.
+ * region hasta que el jugador ya esta sobre ella.
  *
- * La corrección es barata: ordenar por distancia a la posición <em>proyectada</em>, sumándole a la
- * actual la velocidad por un horizonte de tiempo. A baja velocidad la proyección casi no se mueve
- * de la posición actual y el comportamiento converge al de siempre, así que el caso ya validado no
+ * La correccion es barata: ordenar por distancia a la posicion <em>proyectada</em>, sumandole a la
+ * actual la velocidad por un horizonte de tiempo. A baja velocidad la proyeccion casi no se mueve
+ * de la posicion actual y el comportamiento converge al de siempre, asi que el caso ya validado no
  * puede empeorar.
  *
- * Esta clase solo calcula el adelanto. Qué se hace con él —qué se genera y con qué prioridad— es
- * del renderer, y qué se dibuja sigue decidiéndose con la posición real: adelantar el dibujo
- * movería el domo respecto de la cámara y dejaría un borde visible por detrás.
+ * Esta clase solo calcula el adelanto. Que se hace con el -que se genera y con que prioridad- es
+ * del renderer, y que se dibuja sigue decidiendose con la posicion real: adelantar el dibujo
+ * moveria el domo respecto de la camara y dejaria un borde visible por detras.
  */
 public final class MotionPrefetch {
 
-    /** Cuánto tiempo hacia adelante se proyecta. */
+    /** Cuanto tiempo hacia adelante se proyecta. */
     public static final double HORIZON_SECONDS = 1.5D;
 
     /**
-     * Tope del adelanto, en bloques: una región.
+     * Tope del adelanto, en bloques: una region.
      *
-     * Es el límite duro por si algo produce una velocidad alta pero todavía creíble. Se alcanza a
-     * partir de unos 171 b/s, que ningún movimiento normal sostiene.
+     * Es el limite duro por si algo produce una velocidad alta pero todavia creible. Se alcanza a
+     * partir de unos 171 b/s, que ningun movimiento normal sostiene.
      */
     public static final double MAX_LEAD = 256.0D;
 
     /**
      * Velocidad por encima de la cual la muestra se descarta en vez de acotarse.
      *
-     * Un teletransporte, un cambio de dimensión o un frame perdido producen un salto de posición
+     * Un teletransporte, un cambio de dimension o un frame perdido producen un salto de posicion
      * que dividido por el delta de tiempo da una velocidad absurda. Acotar el adelanto no alcanza:
-     * daría 256 bloques de adelanto en una dirección que no significa nada, y el sistema se pondría
-     * a generar regiones donde el jugador no va a ir. Elytra con cohetes ronda los 60-70 b/s, así
+     * daria 256 bloques de adelanto en una direccion que no significa nada, y el sistema se pondria
+     * a generar regiones donde el jugador no va a ir. Elytra con cohetes ronda los 60-70 b/s, asi
      * que 200 deja margen de sobra para cualquier movimiento real, incluidos los de otros mods.
      */
     public static final double MAX_PLAUSIBLE_SPEED = 200.0D;
@@ -44,15 +44,15 @@ public final class MotionPrefetch {
     /**
      * Por debajo de esta velocidad no se adelanta nada.
      *
-     * Caminar da unos 4,3 b/s y correr unos 5,6. Adelantar ahí no aporta —sobra margen— y en cambio
-     * haría que el mínimo movimiento reordenara la cola.
+     * Caminar da unos 4,3 b/s y correr unos 5,6. Adelantar ahi no aporta -sobra margen- y en cambio
+     * haria que el minimo movimiento reordenara la cola.
      */
     public static final double MIN_SPEED = 8.0D;
 
-    /** Suavizado exponencial de la velocidad. Un solo frame raro no debe mover la proyección. */
+    /** Suavizado exponencial de la velocidad. Un solo frame raro no debe mover la proyeccion. */
     private static final double SMOOTHING = 0.2D;
 
-    /** Delta de tiempo máximo admitido entre muestras. Más que esto es una pausa, no movimiento. */
+    /** Delta de tiempo maximo admitido entre muestras. Mas que esto es una pausa, no movimiento. */
     private static final double MAX_DELTA_SECONDS = 0.5D;
 
     private double velocityX;
@@ -62,7 +62,7 @@ public final class MotionPrefetch {
     private double lastSeconds;
     private boolean started;
 
-    /** Registra la posición de este frame y actualiza la velocidad estimada. */
+    /** Registra la posicion de este frame y actualiza la velocidad estimada. */
     public void update(double x, double z, double seconds) {
         if (!this.started) {
             this.started = true;
@@ -76,7 +76,7 @@ public final class MotionPrefetch {
         this.lastSeconds = seconds;
 
         if (dt <= 0.0D || dt > MAX_DELTA_SECONDS) {
-            // El juego estuvo en pausa, o el tiempo del mundo saltó. La posición se acepta como
+            // El juego estuvo en pausa, o el tiempo del mundo salto. La posicion se acepta como
             // nueva referencia pero no se deduce ninguna velocidad de ella.
             this.lastX = x;
             this.lastZ = z;
@@ -91,8 +91,8 @@ public final class MotionPrefetch {
         this.lastZ = z;
 
         if (Math.sqrt(sampleX * sampleX + sampleZ * sampleZ) > MAX_PLAUSIBLE_SPEED) {
-            // No es movimiento: es un teletransporte, un cambio de dimensión o un frame perdido.
-            // La posición nueva ya quedó como referencia; la velocidad se descarta entera.
+            // No es movimiento: es un teletransporte, un cambio de dimension o un frame perdido.
+            // La posicion nueva ya quedo como referencia; la velocidad se descarta entera.
             this.velocityX = 0.0D;
             this.velocityZ = 0.0D;
             return;
@@ -102,7 +102,7 @@ public final class MotionPrefetch {
         this.velocityZ += (sampleZ - this.velocityZ) * SMOOTHING;
     }
 
-    /** Vuelve al estado inicial. Al cambiar de mundo o de dimensión. */
+    /** Vuelve al estado inicial. Al cambiar de mundo o de dimension. */
     public void reset() {
         this.started = false;
         this.velocityX = 0.0D;
@@ -123,7 +123,7 @@ public final class MotionPrefetch {
         return this.velocityZ * this.horizonFactor();
     }
 
-    /** Longitud del adelanto, en bloques. Es cuánto hay que agrandar el radio de barrido. */
+    /** Longitud del adelanto, en bloques. Es cuanto hay que agrandar el radio de barrido. */
     public double leadLength() {
         double x = this.leadX();
         double z = this.leadZ();
@@ -131,10 +131,10 @@ public final class MotionPrefetch {
     }
 
     /**
-     * Segundos efectivos de proyección, ya con el mínimo y el tope aplicados.
+     * Segundos efectivos de proyeccion, ya con el minimo y el tope aplicados.
      *
-     * Devolver un factor en vez de recortar cada eje por separado mantiene la dirección intacta:
-     * recortar X y Z de a uno torcería el adelanto en diagonal.
+     * Devolver un factor en vez de recortar cada eje por separado mantiene la direccion intacta:
+     * recortar X y Z de a uno torceria el adelanto en diagonal.
      */
     private double horizonFactor() {
         double speed = this.speed();

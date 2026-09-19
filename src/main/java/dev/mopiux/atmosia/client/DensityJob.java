@@ -7,11 +7,11 @@ import dev.mopiux.atmosia.core.NoiseField;
 import dev.mopiux.atmosia.core.RegionKey;
 
 /**
- * Cálculo del campo de densidad de una región, para ejecutar fuera del hilo de render.
+ * Calculo del campo de densidad de una region, para ejecutar fuera del hilo de render.
  *
- * Es deliberadamente pura: recibe seed, capa y región, y devuelve un arreglo. No toca Minecraft,
- * no toca OpenGL y no comparte estado mutable, así que es segura en cualquier hilo. Esa es la
- * mitad del modelo de concurrencia de la Sección 9.4 que puede paralelizarse; la construcción de
+ * Es deliberadamente pura: recibe seed, capa y region, y devuelve un arreglo. No toca Minecraft,
+ * no toca OpenGL y no comparte estado mutable, asi que es segura en cualquier hilo. Esa es la
+ * mitad del modelo de concurrencia de la Seccion 9.4 que puede paralelizarse; la construccion de
  * la malla y la subida a GPU se quedan en el hilo de render, donde vive el contexto de OpenGL.
  */
 public final class DensityJob {
@@ -54,8 +54,8 @@ public final class DensityJob {
     /**
      * Calcula la densidad celda por celda.
      *
-     * Se muestrea en el centro de cada celda y en coordenadas locales a la región, nunca absolutas:
-     * es la estrategia de floating origin de la Sección 4, y es lo que mantiene el ruido estable a
+     * Se muestrea en el centro de cada celda y en coordenadas locales a la region, nunca absolutas:
+     * es la estrategia de floating origin de la Seccion 4, y es lo que mantiene el ruido estable a
      * millones de bloques del origen.
      */
     public Result compute() {
@@ -89,7 +89,7 @@ public final class DensityJob {
             return this.nonEmptyCells == 0;
         }
 
-        /** Cota superior de cuádruples, para consultar el presupuesto antes de construir. */
+        /** Cota superior de cuadruples, para consultar el presupuesto antes de construir. */
         public int estimatedQuads() {
             return this.nonEmptyCells * this.job.lod().slices();
         }

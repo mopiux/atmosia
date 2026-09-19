@@ -10,12 +10,12 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Enganches de render y de tick.
  *
- * Las nubes se dibujan después de los bloques translúcidos y antes del clima: ya están ordenadas
+ * Las nubes se dibujan despues de los bloques translucidos y antes del clima: ya estan ordenadas
  * respecto del terreno, y la lluvia y la nieve siguen quedando por delante, que es donde el
  * jugador espera verlas.
  *
- * VERIFICAR: que esta etapa sea la correcta en 1.20.1 y cómo se comporta en modo de gráficos
- * fabuloso. Si las nubes tapan la lluvia o desaparecen detrás del agua, este es el punto a mover.
+ * VERIFICAR: que esta etapa sea la correcta en 1.20.1 y como se comporta en modo de graficos
+ * fabuloso. Si las nubes tapan la lluvia o desaparecen detras del agua, este es el punto a mover.
  */
 @Mod.EventBusSubscriber(Dist.CLIENT)
 public final class AtmosiaClientEvents {

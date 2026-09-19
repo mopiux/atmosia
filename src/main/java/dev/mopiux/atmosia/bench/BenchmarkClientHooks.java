@@ -9,8 +9,8 @@ import net.minecraftforge.fml.common.Mod;
  * Enganches de cliente del harness.
  *
  * El frame se mide entre el inicio de un render tick y el del siguiente, que es el intervalo que
- * el jugador percibe como framerate. Medir dentro del render del mundo dejaría afuera la GUI y la
- * presentación, y daría números mejores que la realidad.
+ * el jugador percibe como framerate. Medir dentro del render del mundo dejaria afuera la GUI y la
+ * presentacion, y daria numeros mejores que la realidad.
  */
 @Mod.EventBusSubscriber(Dist.CLIENT)
 public final class BenchmarkClientHooks {

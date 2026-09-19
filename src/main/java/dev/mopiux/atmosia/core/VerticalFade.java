@@ -1,11 +1,11 @@
 package dev.mopiux.atmosia.core;
 
 /**
- * Culling vertical con transición gradual (Sección 6.3).
+ * Culling vertical con transicion gradual (Seccion 6.3).
  *
- * El documento es explícito en que un corte binario produce popping y no se acepta: la capa que
- * sale del rango razonable de visión baja su opacidad progresivamente, y el descarte total de
- * geometría solo ocurre cuando el fade ya llegó cerca de cero, de forma que el propio fade tape el
+ * El documento es explicito en que un corte binario produce popping y no se acepta: la capa que
+ * sale del rango razonable de vision baja su opacidad progresivamente, y el descarte total de
+ * geometria solo ocurre cuando el fade ya llego cerca de cero, de forma que el propio fade tape el
  * corte real.
  */
 public final class VerticalFade {
@@ -32,14 +32,14 @@ public final class VerticalFade {
     }
 
     /**
-     * Opacidad de una capa vista desde una altura de cámara.
+     * Opacidad de una capa vista desde una altura de camara.
      *
-     * Estar dentro de la capa nunca atenúa: es el caso en que más se la ve. La atenuación crece con
+     * Estar dentro de la capa nunca atenua: es el caso en que mas se la ve. La atenuacion crece con
      * la distancia vertical a la capa, mires desde arriba o desde abajo.
      *
-     * @param cameraY   altura de la cámara
+     * @param cameraY   altura de la camara
      * @param layer     capa evaluada
-     * @param pitchDeg  inclinación de la cámara en grados, negativa mirando hacia arriba
+     * @param pitchDeg  inclinacion de la camara en grados, negativa mirando hacia arriba
      */
     public float opacity(double cameraY, CloudLayerDef layer, double pitchDeg) {
         double verticalDistance;
@@ -52,7 +52,7 @@ public final class VerticalFade {
         }
 
         double effective = verticalDistance;
-        // Mirar hacia la capa la mantiene visible más lejos: la dirección de la vista es parte del
+        // Mirar hacia la capa la mantiene visible mas lejos: la direccion de la vista es parte del
         // culling, no solo la altura absoluta.
         boolean lookingAtLayer = (cameraY < layer.baseHeight() && pitchDeg < 0.0D)
                 || (cameraY > layer.topHeight() && pitchDeg > 0.0D);

@@ -14,13 +14,13 @@ import java.util.Locale;
 /**
  * Escritura de resultados a CSV.
  *
- * Dos archivos por diseño:
+ * Dos archivos por diseno:
  * - {@code results.csv}: una fila por corrida, acumulativo. Es el que se compara entre fases.
  * - {@code frames-<escenario>-<timestamp>.csv}: una fila por frame de esa corrida. Permite
- *   recalcular percentiles y ver dónde estuvieron los tirones, en vez de confiar en un promedio.
+ *   recalcular percentiles y ver donde estuvieron los tirones, en vez de confiar en un promedio.
  *
- * Todos los números se formatean con {@link Locale#ROOT} a propósito: con locale del sistema, una
- * máquina en español escribe "16,7" y rompe el CSV para cualquiera que lo abra después.
+ * Todos los numeros se formatean con {@link Locale#ROOT} a proposito: con locale del sistema, una
+ * maquina en espanol escribe "16,7" y rompe el CSV para cualquiera que lo abra despues.
  */
 public final class CsvReporter {
 
@@ -30,7 +30,7 @@ public final class CsvReporter {
     private static final String HEADER = String.join(",",
             "timestamp", "scenario", "renderer", "coverage",
             // El perfil y la cantidad van en la fila: sin ellos, dos corridas del mismo escenario
-            // no son comparables y no hay forma de saberlo después.
+            // no son comparables y no hay forma de saberlo despues.
             "cloud_mode", "quality_profile", "coverage_scale",
             "duration_s", "frames",
             "avg_fps", "low_1pct_fps",
@@ -48,13 +48,13 @@ public final class CsvReporter {
     }
 
     /**
-     * Agrega una fila de resumen, creando el archivo con encabezado si no existía.
+     * Agrega una fila de resumen, creando el archivo con encabezado si no existia.
      *
-     * Si el archivo ya existe pero su encabezado es de una versión anterior del mod, se aparta con
+     * Si el archivo ya existe pero su encabezado es de una version anterior del mod, se aparta con
      * el nombre cambiado y se empieza uno nuevo. Agregar columnas nuevas debajo de un encabezado
      * viejo produce un archivo donde cada valor cae en la columna equivocada: se sigue abriendo sin
-     * error y todo lo que se lea de él es mentira. Un archivo de mediciones que miente en silencio
-     * es peor que no tenerlo, y pasó de verdad: la tanda del 18/09 quedó corrida tres columnas.
+     * error y todo lo que se lea de el es mentira. Un archivo de mediciones que miente en silencio
+     * es peor que no tenerlo, y paso de verdad: la tanda del 18/09 quedo corrida tres columnas.
      */
     public Path appendSummary(String csvRow) throws IOException {
         Files.createDirectories(this.directory);
@@ -80,14 +80,14 @@ public final class CsvReporter {
         return file;
     }
 
-    /** Primera línea del archivo, o cadena vacía si está vacío o no se puede leer. */
+    /** Primera linea del archivo, o cadena vacia si esta vacio o no se puede leer. */
     private static String firstLine(Path file) {
         try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             String line = reader.readLine();
             return line == null ? "" : line;
         } catch (IOException e) {
             // No se pudo leer: se trata como encabezado distinto y el archivo se aparta. Prefiere
-            // un archivo de más a arriesgar filas corridas en el que ya está.
+            // un archivo de mas a arriesgar filas corridas en el que ya esta.
             return "";
         }
     }
@@ -121,12 +121,12 @@ public final class CsvReporter {
         return file;
     }
 
-    /** NaN se escribe como celda vacía: vacío es "no medido", que no es lo mismo que cero. */
+    /** NaN se escribe como celda vacia: vacio es "no medido", que no es lo mismo que cero. */
     public static String num(double value) {
         return Double.isNaN(value) ? "" : String.format(Locale.ROOT, "%.4f", value);
     }
 
-    /** -1 es la convención de "no aplica" de {@link CloudMetricsProvider}. */
+    /** -1 es la convencion de "no aplica" de {@link CloudMetricsProvider}. */
     public static String num(long value) {
         return value < 0L ? "" : Long.toString(value);
     }

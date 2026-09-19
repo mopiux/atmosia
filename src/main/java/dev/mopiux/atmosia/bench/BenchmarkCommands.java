@@ -14,8 +14,8 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Comandos de cliente para disparar una corrida.
  *
- * Son comandos de cliente y no de servidor a propósito: el benchmark mide el render local y no
- * tiene por qué existir en un servidor.
+ * Son comandos de cliente y no de servidor a proposito: el benchmark mide el render local y no
+ * tiene por que existir en un servidor.
  *
  * Uso:
  *   /atmosiabench list
@@ -60,7 +60,7 @@ public final class BenchmarkCommands {
     private static int run(CommandSourceStack source, String id, double warmup, double duration) {
         BenchmarkScenario scenario = BenchmarkScenario.byId(id);
         if (scenario == null) {
-            reply(source, "Escenario desconocido: " + id + ". Probá /atmosiabench list");
+            reply(source, "Escenario desconocido: " + id + ". Proba /atmosiabench list");
             return 0;
         }
         if (!BenchmarkRunner.get().start(scenario, warmup, duration)) {

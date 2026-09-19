@@ -5,12 +5,12 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.network.chat.Component;
 
 /**
- * Deslizador de un valor continuo, con confirmación diferida.
+ * Deslizador de un valor continuo, con confirmacion diferida.
  *
- * El detalle que importa es cuándo se confirma. Un deslizador emite un valor nuevo por cada píxel
- * que se arrastra, y confirmar cada uno significaría, acá, escribir el archivo de configuración y
- * tirar toda la geometría del cielo docenas de veces por segundo. Así que mientras se arrastra solo
- * se actualiza la etiqueta, y el valor se confirma al soltar. El jugador ve el número moverse en
+ * El detalle que importa es cuando se confirma. Un deslizador emite un valor nuevo por cada pixel
+ * que se arrastra, y confirmar cada uno significaria, aca, escribir el archivo de configuracion y
+ * tirar toda la geometria del cielo docenas de veces por segundo. Asi que mientras se arrastra solo
+ * se actualiza la etiqueta, y el valor se confirma al soltar. El jugador ve el numero moverse en
  * vivo y el mod trabaja una sola vez.
  */
 public final class AtmosiaSlider extends AbstractSliderButton {
@@ -21,7 +21,7 @@ public final class AtmosiaSlider extends AbstractSliderButton {
     private final DoubleConsumer onCommit;
     private final LabelFormatter formatter;
 
-    /** Lo último que se confirmó, para no confirmar de nuevo un valor que no se movió. */
+    /** Lo ultimo que se confirmo, para no confirmar de nuevo un valor que no se movio. */
     private double committed;
 
     @FunctionalInterface
@@ -60,7 +60,7 @@ public final class AtmosiaSlider extends AbstractSliderButton {
 
     @Override
     protected void applyValue() {
-        // A propósito no confirma: solo la etiqueta, que updateMessage ya actualizó.
+        // A proposito no confirma: solo la etiqueta, que updateMessage ya actualizo.
     }
 
     @Override
@@ -70,7 +70,7 @@ public final class AtmosiaSlider extends AbstractSliderButton {
     }
 
     /**
-     * Confirma el valor si cambió. Lo llama el soltar del ratón y también el cierre de la pantalla,
+     * Confirma el valor si cambio. Lo llama el soltar del raton y tambien el cierre de la pantalla,
      * porque las flechas del teclado mueven el deslizador sin que haya un soltar.
      */
     public void commit() {

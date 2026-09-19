@@ -272,6 +272,48 @@ dibuja. Caminando no adelanta nada, con elytra adelanta 67 bloques, y un teletra
 nada — la primera versión sí lo hacía, acotado a 256 bloques en una dirección sin sentido, y lo
 delató una prueba.
 
+## Las lineas rectas en el cielo: causa encontrada (0.2.4)
+
+Del video del 19/09. Medido sobre los fotogramas: las lineas son crestas de **4 a 8 niveles de gris
+sobre el fondo** (un 2 a 3 por ciento), de 4 a 6 pixeles de ancho, largas y perfectamente rectas.
+Que sean crestas y no escalones importa: un escalon separa dos zonas de brillo distinto, una cresta
+es opacidad de mas en una banda fina.
+
+**No estan en el ruido.** Se volco el campo de densidad a imagen alrededor del origen del espacio de
+nube y a 500.000 bloques de el: ninguna fila ni columna tiene curvatura anomala, y nada especial en
+x=0 ni en z=0. Queda descartada la hipotesis del hash.
+
+**Son costuras entre niveles de detalle.** Dos regiones vecinas con distinto nivel comparten un
+borde recto de 256 bloques. Y las alturas de los cortes no coincidian en ningun caso:
+
+| Nivel | Alturas de corte, capa baja |
+|---|---|
+| HIGH (8) | 173, 175, 177, 179, 181, 183, 185, 187 |
+| MEDIUM (4) | 174, 178, 182, 186 |
+| LOW (2) | 176, 184 |
+
+Cero coincidencias entre niveles vecinos. En la banda de pantalla que cruza la costura se ven los
+dos juegos de planos entrelazados —doce planos distintos donde a cada lado hay ocho o cuatro— y el
+alfa acumulado sube de 0,920 a **0,994**. Un 8 por ciento mas de opacidad en una banda fina, larga y
+recta: poco contraste, pero el ojo detecta una recta de inmediato.
+
+Corregido con una escalera de alturas compartida: las alturas de un nivel grueso son ahora un
+subconjunto exacto de las del fino. Y el umbral y el sombreado pasan a depender de la altura
+normalizada en vez del indice del corte, porque si dependieran del indice dos cortes coplanares de
+niveles distintos tendrian contenido distinto y la costura se veria igual. Hay pruebas de las tres
+invariantes.
+
+## Acentos y codificacion (0.2.4)
+
+Los acentos del menu se veian como simbolos sueltos: "Cuanto" aparecia como "Cunnto" y un punto medio
+como una ene mayuscula. La causa no era la fuente de Minecraft sino la compilacion: `build.gradle` no
+fijaba la codificacion, asi que javac usaba la del sistema —windows-1252 en un Windows en espanol—
+sobre archivos que estaban en UTF-8.
+
+Todo el codigo fuente del mod paso a ser **ASCII puro**, que es lo que se pidio y ademas hace el
+problema imposible. Y se fijo UTF-8 en `build.gradle` igual, para que ningun caracter que entre en el
+futuro vuelva a llegar al juego convertido en otro.
+
 ## Limitaciones conocidas
 
 - **Orden de blending dentro de una región.** Los slices se hornean de abajo hacia arriba en un

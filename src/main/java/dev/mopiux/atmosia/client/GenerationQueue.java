@@ -15,22 +15,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Cola de generación diferida (Secciones 8.1 y 9.4).
+ * Cola de generacion diferida (Secciones 8.1 y 9.4).
  *
  * Los hilos de trabajo calculan densidad; el hilo de render recoge los resultados y arma la malla
  * dentro del presupuesto del frame. El reparto es el que exige el documento: el trabajo pesado se
- * distribuye y ninguna actualización congela el juego.
+ * distribuye y ninguna actualizacion congela el juego.
  *
- * El orden de prioridad lo impone quien envía, que recorre las regiones de más urgente a menos y
- * deja de enviar cuando llena la cola. Una cola con prioridad interna no ayudaría: la prioridad
- * cambia cada vez que el jugador gira la cabeza, así que lo correcto es reevaluarla cada frame y
+ * El orden de prioridad lo impone quien envia, que recorre las regiones de mas urgente a menos y
+ * deja de enviar cuando llena la cola. Una cola con prioridad interna no ayudaria: la prioridad
+ * cambia cada vez que el jugador gira la cabeza, asi que lo correcto es reevaluarla cada frame y
  * mantener poca cosa en vuelo.
  */
 public final class GenerationQueue {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("atmosia");
 
-    /** Tope de trabajos en vuelo. Más que esto solo genera trabajo que la prioridad ya descartó. */
+    /** Tope de trabajos en vuelo. Mas que esto solo genera trabajo que la prioridad ya descarto. */
     private static final int MAX_IN_FLIGHT = 24;
 
     private final ExecutorService executor;
@@ -48,10 +48,10 @@ public final class GenerationQueue {
             return thread;
         };
         this.executor = Executors.newFixedThreadPool(count, factory);
-        LOGGER.debug("Cola de generación con {} hilos", count);
+        LOGGER.debug("Cola de generacion con {} hilos", count);
     }
 
-    /** Si la región ya está siendo calculada. */
+    /** Si la region ya esta siendo calculada. */
     public boolean isInFlight(RegionKey key) {
         return this.inFlight.contains(key);
     }
@@ -64,7 +64,7 @@ public final class GenerationQueue {
         return this.inFlight.size();
     }
 
-    /** Envía un trabajo. Devuelve false si ya estaba en vuelo o la cola está saturada. */
+    /** Envia un trabajo. Devuelve false si ya estaba en vuelo o la cola esta saturada. */
     public boolean submit(DensityJob job) {
         if (this.isSaturated() || !this.inFlight.add(job.key())) {
             return false;
@@ -74,7 +74,7 @@ public final class GenerationQueue {
                 try {
                     this.completed.add(job.compute());
                 } catch (RuntimeException e) {
-                    LOGGER.error("Falló la generación de {}", job.key(), e);
+                    LOGGER.error("Fallo la generacion de {}", job.key(), e);
                 } finally {
                     this.inFlight.remove(job.key());
                 }
@@ -92,7 +92,7 @@ public final class GenerationQueue {
         return this.completed.poll();
     }
 
-    /** Descarta lo pendiente. Se usa al cambiar de mundo o de configuración. */
+    /** Descarta lo pendiente. Se usa al cambiar de mundo o de configuracion. */
     public void clear() {
         this.completed.clear();
     }
