@@ -207,6 +207,24 @@ public final class CoreSmokeTest {
         return color;
     }
 
+    /**
+     * Color final de una columna de nube sobre el cielo, con {@code cortes} cortes.
+     *
+     * Se compone en el orden en que el constructor emite los cortes, que es el orden en que la GPU
+     * los mezcla.
+     */
+    static double columnaCompuesta(DensityField f, CloudLayerDef capa, int cortes, double densidad) {
+        float[] alfas = DensityField.sliceAlphas(cortes);
+        double propio = 0.0D;
+        double resto = 1.0D;
+        for (int i = 0; i < cortes; i++) {
+            double a = f.cellAlpha(densidad, f.sliceThreshold(i, cortes)) * alfas[i];
+            propio = capa.green() * f.shade(densidad, i, cortes) * a + propio * (1.0D - a);
+            resto *= (1.0D - a);
+        }
+        return propio + 0.72D * resto;
+    }
+
     /** Perfiles graficos: que los tres se ordenen y que el tope de detalle mande. */
     static void profiles() {
         QualityProfile.Settings low = QualityProfile.LOW.resolve(null);
@@ -500,10 +518,45 @@ public final class CoreSmokeTest {
                     break;
                 }
                 mismoUmbral &= Math.abs(f.sliceThreshold(ig, cg) - f.sliceThreshold(igual, cf)) < 1.0E-9D;
-                mismaSombra &= Math.abs(f.shade(0.5D, ig, cg) - f.shade(0.5D, igual, cf)) < 1.0E-6F;
+                // El sombreado de un corte suelto ya NO tiene por que coincidir entre niveles: la
+                // correccion por nivel lo cambia a proposito. Lo que tiene que coincidir es la
+                // columna entera, y eso se verifica abajo.
+                mismaSombra &= f.shade(0.5D, ig, cg) > 0.0F;
             }
             check("umbral igual en cortes coplanares " + niveles[i] + "|" + niveles[i + 1], mismoUmbral, "");
-            check("sombreado igual en cortes coplanares " + niveles[i] + "|" + niveles[i + 1], mismaSombra, "");
+            check("sombreado valido en cortes coplanares " + niveles[i] + "|" + niveles[i + 1], mismaSombra, "");
+        }
+
+        // La condicion que de verdad importa en una costura: que la COLUMNA ENTERA de un lado se
+        // vea igual que la del otro. Es lo que el ojo compara. No alcanza con que los cortes
+        // coplanares sean iguales, porque los alfas por corte no lo son -no pueden serlo, es lo
+        // que mantiene constante la opacidad- y el compuesto sale distinto igual.
+        //
+        // A densidad saturada la coincidencia tiene que ser exacta. A densidad parcial las dos
+        // pilas tampoco tapan lo mismo, y eso ninguna correccion de color lo arregla, asi que ahi
+        // se exige que el salto quede por debajo de lo que se nota.
+        for (int i = 0; i + 1 < niveles.length; i++) {
+            int cf = niveles[i].slices();
+            int cg = niveles[i + 1].slices();
+            double peorParcial = 0.0D;
+            double peorSaturado = 0.0D;
+            for (int paso = 0; paso <= 100; paso++) {
+                double d = paso / 100.0D;
+                double fino = columnaCompuesta(f, CloudLayerDef.LOW, cf, d);
+                double grueso = columnaCompuesta(f, CloudLayerDef.LOW, cg, d);
+                double salto = Math.abs(fino - grueso) * 255.0D;
+                if (d >= 0.70D) {
+                    peorSaturado = Math.max(peorSaturado, salto);
+                } else {
+                    peorParcial = Math.max(peorParcial, salto);
+                }
+            }
+            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " es exacta con nube densa",
+                    peorSaturado < 0.01D,
+                    String.format(Locale.ROOT, "%.3f niveles de gris", peorSaturado));
+            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " se mantiene baja con nube tenue",
+                    peorParcial < 1.8D,
+                    String.format(Locale.ROOT, "%.2f niveles de gris", peorParcial));
         }
 
         // Los cortes tienen que seguir repartidos por el espesor, no amontonados.

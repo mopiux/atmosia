@@ -1,6 +1,6 @@
 # El método: cómo se cargan y se dibujan las nubes
 
-*Descripción técnica del sistema tal como está en la versión 0.2.5. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
+*Descripción técnica del sistema tal como está en la versión 0.2.6. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
 
 ---
 
@@ -242,6 +242,22 @@ alfa_i = s * peso_i,  con s tal que  producto(1 − alfa_i) = 1 − 0.92
 El factor común se resuelve por bisección, una vez por malla construida. Con ocho cortes eso da alfas de 0,190 en los extremos y 0,325 en el centro; con cuatro, 0,326 y 0,519.
 
 El peso es lo que hace que la capa **se desvanezca hacia arriba y hacia abajo** en vez de terminar en un canto duro. Un canto duro, visto de canto, es justamente lo que se lee como una lámina.
+
+**El color: también constante entre niveles.** Que la opacidad coincida no alcanza. Cada nivel reparte sus cortes sobre alturas distintas y con alfas distintos, así que la mezcla de sombreados que sale de la pila también difiere: medido a densidad saturada, una región de ocho cortes quedaba **1,7 niveles de gris** más oscura que su vecina de cuatro. Como el límite entre dos regiones es recto y mide 256 bloques, esa diferencia se lee como un panel.
+
+La corrección es un factor sobre el sombreado, tabulado por nivel y por densidad, que lleva la columna entera al color que daría el nivel más detallado:
+
+```
+correccion = pesoDeColor(8 cortes, densidad) / pesoDeColor(n cortes, densidad)
+```
+
+Con una salvaguarda que importa: **solo se aplica donde las dos pilas ya tapan lo mismo.** A densidades bajas un nivel puede no tener ningún corte activo mientras el otro sí, y ahí subirle el brillo al que tapa menos lo aleja en vez de acercarlo. La corrección se desvanece a medida que las opacidades se separan, y por encima de 0,02 de diferencia se apaga del todo.
+
+| | Costura cercana (8→4 cortes) | Costura lejana (4→2 cortes) |
+|---|---|---|
+| Peor salto, 0.2.5 | 0,99 niveles | 3,67 niveles |
+| Peor salto, 0.2.6 | **0,67** | **1,65** |
+| Con nube densa | **0,000** | **0,001** |
 
 La pila no llega a 1 a propósito: una nube que tapa el cielo por completo deja de leerse como volumen. Y como la opacidad total no cambia entre niveles, **el nivel de detalle cambia la estructura interna de la nube y no su densidad aparente**, que es lo que debe hacer un LOD.
 
