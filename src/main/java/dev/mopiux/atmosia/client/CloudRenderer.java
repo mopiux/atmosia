@@ -64,6 +64,17 @@ public final class CloudRenderer implements CloudMetricsProvider {
 
     private final List<DensityJob.Result> deferred = new ArrayList<>();
 
+    /**
+     * Con que orden de mezcla esta horneada cada capa ahora mismo.
+     *
+     * Cambia solo cuando la camara cruza la capa, que es raro, y el cambio se propaga region por
+     * region igual que un cambio de nivel de detalle: sin huecos y dentro del presupuesto.
+     */
+    private final boolean[] layerTopDown = new boolean[CloudLayerDef.DEFAULTS.length];
+
+    /** Margen para no rehornear todo el tiempo cuando la camara queda justo en el medio. */
+    private static final double CROSSING_MARGIN = 12.0D;
+
     private long frame;
     private int lastQuads;
     private int lastDrawCalls;
@@ -80,6 +91,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
         this.appliedCoverageScale = AtmosiaConfig.CLIENT.coverageScale.get();
         this.budget = budgetFor(this.appliedQuality);
         this.queue = new GenerationQueue(AtmosiaConfig.CLIENT.generationThreads.get());
+        java.util.Arrays.fill(this.layerTopDown, true);
     }
 
     private static CloudBudget budgetFor(QualityProfile.Settings quality) {
@@ -176,6 +188,16 @@ public final class CloudRenderer implements CloudMetricsProvider {
         for (int layerIndex = 0; layerIndex < layers.length; layerIndex++) {
             CloudLayerDef layer = layers[layerIndex];
 
+            // Desde abajo, los cortes altos estan mas lejos y van primero; desde arriba, al reves.
+            // El margen evita rehornear en cada frame cuando la camara se queda en el medio.
+            boolean topDown = this.layerTopDown[layerIndex];
+            if (cameraPos.y < layer.centerHeight() - CROSSING_MARGIN) {
+                topDown = true;
+            } else if (cameraPos.y > layer.centerHeight() + CROSSING_MARGIN) {
+                topDown = false;
+            }
+            this.layerTopDown[layerIndex] = topDown;
+
             float layerOpacity = this.verticalFade.opacity(cameraPos.y, layer, pitch);
             if (VerticalFade.isCulled(layerOpacity)) {
                 continue;
@@ -241,7 +263,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
                                 this.drawList.add(new Entry(mesh, distance, opacity, windX, windZ));
                             }
                         }
-                        if (mesh.lod() == lod) {
+                        if (mesh.lod() == lod && mesh.topDown() == topDown) {
                             continue;
                         }
                         // El LOD cambio: se encola la nueva version, pero se sigue dibujando la
@@ -251,7 +273,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
                     }
 
                     if (RegionPriority.shouldGenerate(priority) && !this.queue.isInFlight(key)) {
-                        pending.add(new Pending(key, layer, lod,
+                        pending.add(new Pending(key, layer, lod, topDown,
                                 RegionPriority.sortKey(priority, aheadDistance)));
                     }
                 }
@@ -266,11 +288,12 @@ public final class CloudRenderer implements CloudMetricsProvider {
                 break;
             }
             this.queue.submit(new DensityJob(item.key, item.layer, item.lod, this.noise,
-                    this.appliedCoverageScale));
+                    this.appliedCoverageScale, item.topDown()));
         }
     }
 
-    private record Pending(RegionKey key, CloudLayerDef layer, LodLevel lod, long sortKey) {
+    private record Pending(RegionKey key, CloudLayerDef layer, LodLevel lod, boolean topDown,
+                           long sortKey) {
     }
 
     /**

@@ -42,6 +42,7 @@ public final class CoreSmokeTest {
         prefetch();
         seams();
         terrazas();
+        ordenDeMezcla();
 
         System.out.println(fails == 0 ? "\nTODO OK" : "\n" + fails + " FALLAS");
         System.exit(fails == 0 ? 0 : 1);
@@ -205,6 +206,80 @@ public final class CoreSmokeTest {
             color = propio * alfa + color * (1.0D - alfa);
         }
         return color;
+    }
+
+    /**
+     * Que el borde entre dos regiones no se vea, aunque cada region sea un draw call propio.
+     *
+     * Cada region se mezcla entera de una vez. Un rayo rasante cerca del borde cruza algunos cortes
+     * de una region y algunos de la vecina, asi que el orden efectivo de mezcla cambia al cruzar el
+     * borde. Si el orden interno de cada region no coincide con el orden de profundidad global, ese
+     * cambio produce un salto de color en una linea recta de 256 bloques: la grilla en el cielo.
+     *
+     * Mezclar de lejos a cerca -los cortes altos primero, mirando desde abajo- hace que el reparto
+     * entre dos regiones de exactamente lo mismo que la pila entera.
+     */
+    static void ordenDeMezcla() {
+        NoiseField n = new NoiseField(5L);
+        DensityField f = new DensityField(n, CloudLayerDef.LOW);
+        int cortes = LodLevel.HIGH.slices();
+
+        double peorCorrecto = 0.0D;
+        double peorInvertido = 0.0D;
+        for (int paso = 0; paso <= 100; paso++) {
+            double d = paso / 100.0D;
+
+            // Orden correcto: de arriba hacia abajo, y la region lejana (los cortes altos) entera
+            // antes que la cercana. El reparto tiene que dar lo mismo que la pila completa.
+            int[] entera = new int[cortes];
+            int[] partida = new int[cortes];
+            for (int i = 0; i < cortes; i++) {
+                entera[i] = cortes - 1 - i;
+                partida[i] = cortes - 1 - i;
+            }
+            peorCorrecto = Math.max(peorCorrecto,
+                    Math.abs(mezcla(f, CloudLayerDef.LOW, cortes, d, entera)
+                            - mezcla(f, CloudLayerDef.LOW, cortes, d, partida)) * 255.0D);
+
+            // Orden de la 0.2.6: de abajo hacia arriba dentro de cada region, pero la region lejana
+            // primero. Es el que producia la grilla.
+            int[] viejoEntero = new int[cortes];
+            int[] viejoPartido = new int[cortes];
+            for (int i = 0; i < cortes; i++) {
+                viejoEntero[i] = i;
+            }
+            int k = 0;
+            for (int i = cortes / 2; i < cortes; i++) {
+                viejoPartido[k++] = i;
+            }
+            for (int i = 0; i < cortes / 2; i++) {
+                viejoPartido[k++] = i;
+            }
+            peorInvertido = Math.max(peorInvertido,
+                    Math.abs(mezcla(f, CloudLayerDef.LOW, cortes, d, viejoEntero)
+                            - mezcla(f, CloudLayerDef.LOW, cortes, d, viejoPartido)) * 255.0D);
+        }
+
+        check("el borde entre regiones da exactamente el mismo color",
+                peorCorrecto < 0.001D,
+                String.format(Locale.ROOT, "%.4f niveles de gris", peorCorrecto));
+        check("  y el orden anterior si producia un salto grande",
+                peorInvertido > 5.0D,
+                String.format(Locale.ROOT, "%.2f niveles de gris", peorInvertido));
+    }
+
+    /** Compone los cortes en el orden dado. */
+    static double mezcla(DensityField f, CloudLayerDef capa, int cortes, double densidad,
+                         int[] orden) {
+        float[] alfas = DensityField.sliceAlphas(cortes);
+        double propio = 0.0D;
+        double resto = 1.0D;
+        for (int i : orden) {
+            double a = f.cellAlpha(densidad, f.sliceThreshold(i, cortes)) * alfas[i];
+            propio = capa.green() * f.shade(densidad, i, cortes) * a + propio * (1.0D - a);
+            resto *= (1.0D - a);
+        }
+        return propio + 0.72D * resto;
     }
 
     /**

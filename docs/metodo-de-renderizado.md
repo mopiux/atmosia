@@ -1,6 +1,6 @@
 # El método: cómo se cargan y se dibujan las nubes
 
-*Descripción técnica del sistema tal como está en la versión 0.2.6. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
+*Descripción técnica del sistema tal como está en la versión 0.2.7. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
 
 ---
 
@@ -303,7 +303,14 @@ Con dos salvaguardas:
 
 ### 4.8 El dibujo
 
-**El orden.** De lejos a cerca. Con transparencia el orden cambia el resultado, así que la lista de dibujo se ordena por distancia descendente antes de emitir nada.
+**El orden.** De lejos a cerca, y en **dos niveles**, porque con transparencia el orden cambia el resultado.
+
+- **Entre regiones**: la lista de dibujo se ordena por distancia descendente antes de emitir nada.
+- **Dentro de una región**: los cortes se emiten en el orden en que la GPU debe mezclarlos, que mirando desde abajo es del más alto al más bajo, y desde arriba al revés. La malla se hornea con ese orden y se rehornea si la cámara cruza la capa.
+
+El segundo nivel no es un detalle. Cada región es un *draw call* propio, así que la región entera se mezcla de una vez. Un rayo rasante cerca del borde entre dos regiones cruza algunos cortes de una y algunos de la otra; si el orden interno de cada región no coincide con el orden de profundidad global, el reparto cambia de golpe al cruzar el borde. Medido, ese salto llegaba a **10 niveles de gris en una línea recta de 256 bloques** — y como cada una de las tres capas tiene su propia grilla de regiones con su propio desfase de viento, las líneas se cruzaban entre sí y recortaban el cielo en rectángulos.
+
+Con el orden correcto el reparto entre dos regiones da exactamente el mismo color que la pila completa, y el borde deja de existir.
 
 **El estado de render.** Todas las decisiones de transparencia en un solo lugar:
 

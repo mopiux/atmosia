@@ -35,7 +35,7 @@ public final class RegionMeshBuilder {
 
         if (result.isEmpty()) {
             // Cielo despejado en esta region. Se cachea igual, para no recalcularla cada frame.
-            return new RegionMesh(job.key(), lod, null, 0, frame);
+            return new RegionMesh(job.key(), lod, null, 0, frame, job.topDown());
         }
 
         DensityField field = new DensityField(noise, layer);
@@ -53,7 +53,19 @@ public final class RegionMeshBuilder {
 
         float[] d = result.density();
         int quads = 0;
-        for (int slice = 0; slice < slices; slice++) {
+        for (int paso = 0; paso < slices; paso++) {
+            // El orden de emision ES el orden de mezcla, y tiene que ser de lejos a cerca.
+            //
+            // Cada region es un draw call propio, asi que la region entera se mezcla de una vez.
+            // Un rayo rasante cerca del borde entre dos regiones cruza algunos cortes de una y
+            // algunos de la otra; si el orden interno de cada region no coincide con el orden de
+            // profundidad global, el reparto cambia de golpe al cruzar el borde y aparece una
+            // linea recta de 256 bloques. Medido, ese salto llegaba a 10 niveles de gris.
+            //
+            // Mirando desde abajo, los cortes altos estan mas lejos, asi que van primero. Desde
+            // arriba es al reves. Como las regiones ya se dibujan de lejos a cerca, con el orden
+            // interno correcto el borde queda exacto.
+            int slice = job.topDown() ? slices - 1 - paso : paso;
             double threshold = field.sliceThreshold(slice, slices);
             float y = (float) field.sliceHeight(slice, slices);
             float sliceAlpha = sliceAlphas[slice];
@@ -92,7 +104,7 @@ public final class RegionMeshBuilder {
         BufferBuilder.RenderedBuffer rendered = builder.end();
         if (quads == 0) {
             rendered.release();
-            return new RegionMesh(job.key(), lod, null, 0, frame);
+            return new RegionMesh(job.key(), lod, null, 0, frame, job.topDown());
         }
 
         VertexBuffer buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
@@ -100,7 +112,7 @@ public final class RegionMeshBuilder {
         buffer.upload(rendered);
         VertexBuffer.unbind();
 
-        return new RegionMesh(job.key(), lod, buffer, quads, frame);
+        return new RegionMesh(job.key(), lod, buffer, quads, frame, job.topDown());
     }
 
     /**

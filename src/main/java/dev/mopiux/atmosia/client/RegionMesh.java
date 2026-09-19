@@ -19,14 +19,22 @@ public final class RegionMesh {
     @Nullable
     private VertexBuffer buffer;
     private final int quads;
+    private final boolean topDown;
     private long lastUsedFrame;
 
-    public RegionMesh(RegionKey key, LodLevel lod, @Nullable VertexBuffer buffer, int quads, long frame) {
+    public RegionMesh(RegionKey key, LodLevel lod, @Nullable VertexBuffer buffer, int quads,
+                      long frame, boolean topDown) {
         this.key = key;
         this.lod = lod;
         this.buffer = buffer;
         this.quads = quads;
         this.lastUsedFrame = frame;
+        this.topDown = topDown;
+    }
+
+    /** Con que orden de mezcla se horneo esta malla. */
+    public boolean topDown() {
+        return this.topDown;
     }
 
     public RegionKey key() {

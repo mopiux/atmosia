@@ -21,18 +21,30 @@ public final class DensityJob {
     private final LodLevel lod;
     private final NoiseField noise;
     private final double coverageScale;
+    private final boolean topDown;
 
     public DensityJob(RegionKey key, CloudLayerDef layer, LodLevel lod, NoiseField noise) {
-        this(key, layer, lod, noise, 1.0D);
+        this(key, layer, lod, noise, 1.0D, true);
     }
 
     public DensityJob(RegionKey key, CloudLayerDef layer, LodLevel lod, NoiseField noise,
-                      double coverageScale) {
+                      double coverageScale, boolean topDown) {
         this.key = key;
         this.layer = layer;
         this.lod = lod;
         this.noise = noise;
         this.coverageScale = coverageScale;
+        this.topDown = topDown;
+    }
+
+    /**
+     * Si los cortes se emiten del mas alto al mas bajo.
+     *
+     * Es lo que decide el orden en que la GPU los mezcla, y tiene que coincidir con el orden de
+     * profundidad visto desde donde esta la camara. Ver {@code RegionMeshBuilder}.
+     */
+    public boolean topDown() {
+        return this.topDown;
     }
 
     public double coverageScale() {
