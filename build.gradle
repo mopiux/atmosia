@@ -1,8 +1,8 @@
-// Scaffolding mínimo para Forge 1.20.1 (ForgeGradle 6).
+// Scaffolding minimo para Forge 1.20.1 (ForgeGradle 6).
 //
-// SIN COMPILAR: el entorno donde se escribió esto no tiene acceso a maven.minecraftforge.net
-// ni a los servidores de Mojang, así que este archivo no pudo ejecutarse una sola vez.
-// Se espera que la primera compilación requiera ajustes menores.
+// SIN COMPILAR: el entorno donde se escribio esto no tiene acceso a maven.minecraftforge.net
+// ni a los servidores de Mojang, asi que este archivo no pudo ejecutarse una sola vez.
+// Se espera que la primera compilacion requiera ajustes menores.
 
 plugins {
     id 'eclipse'
