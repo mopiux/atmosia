@@ -1,6 +1,6 @@
 # El método: cómo se cargan y se dibujan las nubes
 
-*Descripción técnica del sistema tal como está en la versión 0.3.0. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
+*Descripción técnica del sistema tal como está en la versión 0.3.1. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
 
 ---
 
@@ -305,7 +305,7 @@ Con dos salvaguardas:
 
 **El orden.** De lejos a cerca, y en **dos niveles**, porque con transparencia el orden cambia el resultado.
 
-- **Entre regiones**: la lista de dibujo se ordena por distancia descendente antes de emitir nada.
+- **Entre regiones**: la lista de dibujo se ordena por **distancia 3D real** —no la horizontal— antes de emitir nada. Las tres capas están a alturas distintas, así que dos regiones a la misma distancia horizontal no están a la misma distancia de la cámara; ordenarlas por la horizontal las intercala mal, y el error cambia de golpe en el límite entre regiones.
 - **Dentro de una región**: los cortes se emiten en el orden en que la GPU debe mezclarlos, que mirando desde abajo es del más alto al más bajo, y desde arriba al revés. La malla se hornea con ese orden y se rehornea si la cámara cruza la capa.
 
 El segundo nivel no es un detalle. Cada región es un *draw call* propio, así que la región entera se mezcla de una vez. Un rayo rasante cerca del borde entre dos regiones cruza algunos cortes de una y algunos de la otra; si el orden interno de cada región no coincide con el orden de profundidad global, el reparto cambia de golpe al cruzar el borde. Medido, ese salto llegaba a **10 niveles de gris en una línea recta de 256 bloques** — y como cada una de las tres capas tiene su propia grilla de regiones con su propio desfase de viento, las líneas se cruzaban entre sí y recortaban el cielo en rectángulos.
@@ -438,6 +438,14 @@ La escala de ruido es cuántos bloques abarca una unidad de ruido: más alto, fo
 Ningún corte es binario. En los dos casos la geometría se descarta de verdad recién cuando el desvanecimiento ya la dejó prácticamente invisible, de forma que el propio desvanecimiento tape el corte real.
 
 **Por distancia.** Empieza en el último 15 % del domo y llega a cero en el borde. Es lo que evita que el límite del mundo de nubes aparezca como un recorte recto.
+
+**Por distancia, con niebla por fragmento.** El borde del domo no se desvanece por región: se usa la niebla lineal del propio shader del juego, que trabaja sobre la distancia real de cada vértice e interpola por fragmento.
+
+La razón es que una región mide 256 bloques. Si el desvanecimiento se aplica como un multiplicador sobre el *draw call* entero, el borde del domo termina siendo un **polígono escalonado**, y visto desde abajo en ángulo rasante cada escalón es una recta larga en el cielo. Con tres capas a alturas distintas son tres polígonos superpuestos: una grilla.
+
+Además las regiones del borde se dibujan con un margen de media diagonal (181 bloques), porque el nivel se decide con la distancia al *centro* de la región y una región cuyo centro cae afuera todavía puede tener medio lado adentro.
+
+La banda de niebla arranca al 25 % del alcance. Es larga a propósito: además de evitar el escalón, es perspectiva atmosférica —lo lejano se ve más tenue, que es lo que pasa de verdad—.
 
 **Por altura.** Se mide la distancia vertical de la cámara a la capa:
 

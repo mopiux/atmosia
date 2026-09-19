@@ -896,7 +896,32 @@ public final class CoreSmokeTest {
                 LodSelector.forRenderDistance(2, 1.0).maxDistance() >= 256.0,
                 LodSelector.forRenderDistance(2, 1.0).maxDistance());
 
-        check("sin fade en el grueso del rango", sel.distanceFade(500.0) == 1.0F, sel.distanceFade(500.0));
+        // La banda es larga a proposito: es perspectiva atmosferica, y sobre todo es lo que evita
+        // que el borde del domo quede concentrado en pocos pixeles. Medido en el simulador,
+        // acortarla vuelve a producir lineas rectas en el cielo.
+        check("cerca no hay fade", sel.distanceFade(300.0) == 1.0F, sel.distanceFade(300.0));
+        check("la banda de desvanecimiento es larga",
+                sel.distanceFade(500.0) > 0.85F && sel.distanceFade(500.0) < 1.0F,
+                sel.distanceFade(500.0));
+        // Y monotona, sin quiebres: un quiebre en el desvanecimiento tambien se lee como una linea.
+        boolean monotona = true;
+        float previo = 1.0F;
+        for (double d = 0.0; d <= 1500.0; d += 5.0) {
+            float f = sel.distanceFade(d);
+            monotona &= f <= previo + 1.0E-6F;
+            previo = f;
+        }
+        check("el desvanecimiento nunca sube", monotona, "");
+
+        // El borde del domo se dibuja con margen: una region cuyo centro cae afuera todavia puede
+        // tener medio lado adentro, y recortarla entera deja el borde escalonado por region.
+        check("el margen de dibujo cubre media region",
+                LodSelector.DRAW_MARGIN > RegionKey.REGION_SIZE * 0.70D,
+                LodSelector.DRAW_MARGIN);
+        check("el borde se dibuja aunque el centro caiga afuera",
+                sel.levelForDrawing(sel.maxDistance() + 100.0) != null
+                        && sel.levelForDrawing(sel.maxDistance() + LodSelector.DRAW_MARGIN + 1.0) == null,
+                "");
         check("fade parcial cerca del borde",
                 sel.distanceFade(1400.0) > 0.0F && sel.distanceFade(1400.0) < 1.0F, sel.distanceFade(1400.0));
         check("cero en el borde", sel.distanceFade(1500.0) == 0.0F, sel.distanceFade(1500.0));

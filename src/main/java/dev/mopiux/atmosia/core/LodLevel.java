@@ -15,7 +15,7 @@ public enum LodLevel {
 
     HIGH(8, 16, 3),
     MEDIUM(4, 16, 3),
-    LOW(2, 16, 2);
+    LOW(2, 16, 3);
 
     // El lado de celda es el MISMO en los tres niveles, a proposito.
     //

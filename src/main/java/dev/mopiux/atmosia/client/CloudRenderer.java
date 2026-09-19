@@ -1,5 +1,6 @@
 package dev.mopiux.atmosia.client;
 
+import com.mojang.blaze3d.shaders.FogShape;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexBuffer;
@@ -75,12 +76,27 @@ public final class CloudRenderer implements CloudMetricsProvider {
     /** Margen para no rehornear todo el tiempo cuando la camara queda justo en el medio. */
     private static final double CROSSING_MARGIN = 12.0D;
 
+    /**
+     * Donde arranca la niebla del borde, como fraccion del alcance.
+     *
+     * Es generoso a proposito: una banda larga es perspectiva atmosferica -lo lejano se ve mas
+     * tenue, que es lo que pasa de verdad- y ademas es lo que hace que no quede ningun borde
+     * concentrado en pocos pixeles. Medido en el simulador, acortarla vuelve a sacar lineas.
+     */
+    private static final double FOG_START = 0.25D;
+
+    /** El alcance del domo del ultimo frame, para la niebla. */
+    private double lastMaxDistance = 512.0D;
+
     private long frame;
     private int lastQuads;
     private int lastDrawCalls;
     private double lastGenerationMillis = -1.0D;
 
-    private record Entry(RegionMesh mesh, double distance, float opacity,
+    /**
+     * @param depth distancia 3D real de la camara al centro de la region, que es la clave de orden
+     */
+    private record Entry(RegionMesh mesh, double depth, float opacity,
                          double offsetX, double offsetZ) {
     }
 
@@ -168,6 +184,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
         Vector3f look = camera.getLookVector();
         float pitch = camera.getXRot();
 
+        this.lastMaxDistance = selector.maxDistance();
         this.collectAndQueue(cameraPos, look, pitch, selector, seconds, speedScale, frustum);
         this.consumeCompletedWithinBudget();
         this.draw(poseStack, projection, cameraPos, level, partialTick, camera);
@@ -233,8 +250,8 @@ public final class CloudRenderer implements CloudMetricsProvider {
                     double aheadDZ = key.centerZ() - aheadZ;
                     double aheadDistance = Math.sqrt(aheadDX * aheadDX + aheadDZ * aheadDZ);
 
-                    LodLevel drawLod = selector.levelFor(distance);
-                    LodLevel wantedLod = selector.levelFor(aheadDistance);
+                    LodLevel drawLod = selector.levelForDrawing(distance);
+                    LodLevel wantedLod = selector.levelForDrawing(aheadDistance);
                     if (drawLod == null && wantedLod == null) {
                         continue;
                     }
@@ -257,11 +274,18 @@ public final class CloudRenderer implements CloudMetricsProvider {
                     RegionMesh mesh = this.cache.get(key);
                     if (mesh != null) {
                         mesh.markUsed(this.frame);
-                        if (visible && !mesh.isEmpty()) {
-                            float opacity = layerOpacity * selector.distanceFade(distance);
-                            if (!VerticalFade.isCulled(opacity)) {
-                                this.drawList.add(new Entry(mesh, distance, opacity, windX, windZ));
-                            }
+                        if (visible && !mesh.isEmpty() && !VerticalFade.isCulled(layerOpacity)) {
+                            // La profundidad de orden es la distancia 3D, no la horizontal: las
+                            // tres capas estan a alturas distintas, asi que dos regiones a la misma
+                            // distancia horizontal no estan a la misma distancia de la camara.
+                            // Ordenar por la horizontal las intercala mal y el error cambia de
+                            // golpe en el borde entre regiones.
+                            double alturaRelativa = layer.centerHeight() - cameraPos.y;
+                            double depth = Math.sqrt(distance * distance
+                                    + alturaRelativa * alturaRelativa);
+                            // El desvanecimiento del borde del domo ya NO se aplica aca: se hace
+                            // por fragmento con la niebla, en draw().
+                            this.drawList.add(new Entry(mesh, depth, layerOpacity, windX, windZ));
                         }
                         if (mesh.lod() == lod && mesh.topDown() == topDown) {
                             continue;
@@ -373,19 +397,38 @@ public final class CloudRenderer implements CloudMetricsProvider {
         }
     }
 
-    /** Dibuja de lejos a cerca: con transparencia, el orden cambia el resultado. */
+    /** Dibuja de lejos a cerca por distancia 3D: con transparencia, el orden cambia el resultado. */
     private void draw(PoseStack poseStack, Matrix4f projection, Vec3 cameraPos, ClientLevel level,
                       float partialTick, Camera camera) {
         if (this.drawList.isEmpty()) {
             return;
         }
-        this.drawList.sort((a, b) -> Double.compare(b.distance(), a.distance()));
+        this.drawList.sort((a, b) -> Double.compare(b.depth(), a.depth()));
 
         Vec3 cloudColor = level.getCloudColor(partialTick);
         float scatter = this.forwardScatter(level, camera, partialTick);
 
         AtmosiaRenderType.CLOUDS.setupRenderState();
         var shader = GameRenderer.getPositionColorShader();
+
+        // Desvanecimiento del borde del domo, POR FRAGMENTO.
+        //
+        // Antes se aplicaba una vez por region, como un multiplicador sobre el alfa de todo el
+        // draw call. Una region mide 256 bloques, asi que el borde del domo terminaba siendo un
+        // poligono escalonado, y visto desde abajo en angulo rasante cada escalon es una recta
+        // larga en el cielo. Con tres capas a alturas distintas eran tres poligonos superpuestos:
+        // la grilla que se veia.
+        //
+        // El shader POSITION_COLOR del juego aplica niebla lineal sobre la distancia real de cada
+        // vertice, interpolada por fragmento. Usandola, el borde del domo se disuelve sin ningun
+        // escalon. Se conserva el color de niebla que el juego ya tenia puesto, que es el color
+        // atmosferico del horizonte: las nubes se funden con el cielo igual que el terreno.
+        float fogStartPrev = RenderSystem.getShaderFogStart();
+        float fogEndPrev = RenderSystem.getShaderFogEnd();
+        FogShape fogShapePrev = RenderSystem.getShaderFogShape();
+        RenderSystem.setShaderFogShape(FogShape.SPHERE);
+        RenderSystem.setShaderFogStart((float) (this.lastMaxDistance * FOG_START));
+        RenderSystem.setShaderFogEnd((float) (this.lastMaxDistance + LodSelector.DRAW_MARGIN));
 
         for (Entry entry : this.drawList) {
             VertexBuffer buffer = entry.mesh().buffer();
@@ -418,6 +461,9 @@ public final class CloudRenderer implements CloudMetricsProvider {
 
         VertexBuffer.unbind();
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.setShaderFogStart(fogStartPrev);
+        RenderSystem.setShaderFogEnd(fogEndPrev);
+        RenderSystem.setShaderFogShape(fogShapePrev);
         AtmosiaRenderType.CLOUDS.clearRenderState();
     }
 

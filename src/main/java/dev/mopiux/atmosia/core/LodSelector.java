@@ -76,6 +76,31 @@ public final class LodSelector {
         return this.maxDistance;
     }
 
+    /**
+     * Media diagonal de una region, en bloques.
+     *
+     * Es el margen que hay que agregarle al domo para decidir que se dibuja. El nivel de una region
+     * se decide con la distancia a su CENTRO, asi que una region cuyo centro cae justo afuera del
+     * domo todavia puede tener medio lado adentro. Recortarla entera deja el borde del domo
+     * convertido en un poligono escalonado de 256 bloques -y eso, visto desde abajo, es una recta
+     * larga en el cielo.
+     */
+    public static final double DRAW_MARGIN = RegionKey.REGION_SIZE * 0.708D;
+
+    /**
+     * Nivel para dibujar, con el margen del borde ya aplicado.
+     *
+     * Las regiones del borde se dibujan aunque su centro caiga afuera; lo que las hace desaparecer
+     * es el desvanecimiento por distancia, que se aplica por fragmento y no por region.
+     */
+    public LodLevel levelForDrawing(double distance) {
+        LodLevel level = this.levelFor(distance);
+        if (level != null) {
+            return level;
+        }
+        return distance <= this.maxDistance + DRAW_MARGIN ? this.capped(LodLevel.LOW) : null;
+    }
+
     /** Nivel para una distancia dada, o {@code null} si esta fuera de rango y no debe existir. */
     public LodLevel levelFor(double distance) {
         if (distance > this.maxDistance) {
@@ -100,7 +125,7 @@ public final class LodSelector {
     }
 
     /** Donde empieza a desvanecerse el borde del domo, como fraccion del alcance. */
-    private static final double FADE_START = 0.60D;
+    private static final double FADE_START = 0.25D;
 
     /**
      * Atenuacion por distancia en [0,1], para que el borde del mundo de nubes no aparezca como un
