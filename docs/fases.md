@@ -237,6 +237,41 @@ y se empieza uno nuevo. No se pierde nada y ninguno de los dos queda inconsisten
 `docs/sistema-de-nubes.md` explica el sistema completo de generación —del ruido al dibujo— con sus
 ventajas y sus costos, y con estas mediciones interpretadas.
 
+## Artefactos visuales corregidos (0.2.2)
+
+De las capturas del 18-19/09 volando con elytra por debajo de la capa. El detalle completo, con el
+diagnóstico y los números, está en `docs/artefactos-visuales.md`.
+
+**Las bandas grises no venían de acumulación de sombreado.** El corte más bajo tenía un color propio
+de 0,480/0,486/0,502 — más oscuro que el cielo diurno sobre el que se mezcla. Donde se superponían
+pocos cortes, que es el borde de toda formación vista desde abajo, el compuesto caía 0,166 por
+debajo del brillo del cielo. En el núcleo, con los ocho cortes, los de arriba lo compensaban. Por eso
+el defecto aparecía en los bordes y no en el medio.
+
+**El nivel de mayor detalle era opaco.** Con alfa 0,55 por corte, ocho cortes daban una opacidad de
+0,998. Un sistema pensado para dar volumen translúcido producía, en su mejor nivel, una pared.
+
+**Cada cambio de nivel de detalle cambiaba el brillo.** 0,998 con ocho cortes, 0,959 con cuatro,
+0,798 con dos: hasta 20 puntos de opacidad de golpe al cruzar un umbral de distancia. Es la causa
+dominante de la "recarga" que se ve volando, y no estaba en ninguna lista de sospechosos.
+
+Corregido con una sola fórmula: el alfa de cada corte se deriva de cuántos cortes hay, de modo que
+la pila llegue siempre a 0,92. El nivel de detalle pasa a cambiar la estructura interna de la nube y
+no su densidad aparente, que es lo que un LOD debe hacer. Más `BOTTOM_SHADE` de 0,62 a 0,78, que baja
+la caída de 0,166 a 0,050 — una nube vista desde abajo tiene que seguir siendo algo más oscura que
+el cielo, o se lee como niebla.
+
+**`MINIMAL` no existía.** El tramo de `LOW` llegaba hasta el borde del domo, así que el cuarto nivel
+de detalle era inalcanzable. Y era código muerto dañino: usaba celdas de 64 bloques, el tamaño que
+producía las sábanas rectangulares que la 0.0.1 había corregido. Eliminado, con una prueba que
+verifica que todos los niveles declarados sean alcanzables.
+
+**Prefetch direccional.** `MotionPrefetch` proyecta la posición de la cámara 1,5 segundos hacia
+adelante y esa posición decide qué se genera y con qué prioridad; la real sigue decidiendo qué se
+dibuja. Caminando no adelanta nada, con elytra adelanta 67 bloques, y un teletransporte no adelanta
+nada — la primera versión sí lo hacía, acotado a 256 bloques en una dirección sin sentido, y lo
+delató una prueba.
+
 ## Limitaciones conocidas
 
 - **Orden de blending dentro de una región.** Los slices se hornean de abajo hacia arriba en un

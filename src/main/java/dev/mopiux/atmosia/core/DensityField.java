@@ -16,8 +16,27 @@ public final class DensityField {
     /** Ancho de la transición entre "no hay nube" y "nube opaca". Más bajo, bordes más duros. */
     private static final double EDGE_SOFTNESS = 0.22D;
 
-    /** Cuánto oscurece la base de la capa respecto del techo. */
-    private static final float BOTTOM_SHADE = 0.62F;
+    /**
+     * Cuánto oscurece la base de la capa respecto del techo.
+     *
+     * Estuvo en 0,62 hasta la 0.2.1 y era demasiado. El color propio del corte más bajo quedaba en
+     * torno a 0,48 —más oscuro que el cielo diurno sobre el que se mezcla— así que donde se veían
+     * pocos cortes superpuestos, que es el borde de toda formación vista desde abajo, el compuesto
+     * caía por debajo del brillo del cielo y se leía como una banda gris. En el núcleo, con los
+     * ocho cortes, los de arriba lo compensaban y volvía a aclarar: por eso el defecto aparecía en
+     * los bordes y no en el medio.
+     *
+     * 0,78 conserva el gradiente que hace que una nube se lea como nube —la base más oscura que el
+     * techo— sin que el compuesto parcial baje del cielo.
+     */
+    private static final float BOTTOM_SHADE = 0.78F;
+
+    /**
+     * Opacidad que debe alcanzar la pila completa de cortes de una capa, sin importar cuántos sean.
+     *
+     * No llega a 1: una nube que tapa el cielo por completo deja de leerse como volumen.
+     */
+    private static final double STACK_OPACITY = 0.92D;
 
     /**
      * Cobertura máxima admitida. Con cobertura 1.0 no queda un solo punto del cielo por debajo del
@@ -89,6 +108,33 @@ public final class DensityField {
     public double sliceHeight(int index, int slices) {
         double t = slices <= 1 ? 0.5D : (index + 0.5D) / slices;
         return this.layer.baseHeight() + t * this.layer.thickness();
+    }
+
+    /**
+     * Opacidad que le toca a cada corte para que la pila entera llegue siempre a la misma.
+     *
+     * Hasta la 0.2.1 el alfa por corte era una constante —0,55 apilado, 0,85 solo— y la opacidad de
+     * la pila salía de cuántos cortes hubiera. Eso tenía dos consecuencias, las dos visibles:
+     *
+     * <ul>
+     *   <li>Con ocho cortes la pila llegaba a 0,998. El núcleo de una formación era una pared
+     *       opaca, que es lo contrario de lo que el sistema de cortes existe para producir.</li>
+     *   <li>Cada cambio de nivel de detalle cambiaba la opacidad: 0,998 con ocho cortes, 0,959 con
+     *       cuatro, 0,798 con dos. Veinte puntos de brillo de golpe al cruzar un umbral de
+     *       distancia, que es buena parte del "popping" que se ve volando.</li>
+     * </ul>
+     *
+     * Con esta fórmula el nivel de detalle cambia la estructura interna de la nube y no su
+     * densidad aparente, que es lo que debe hacer un LOD.
+     */
+    public static float sliceAlpha(int slices) {
+        int n = Math.max(1, slices);
+        return (float) (1.0D - Math.pow(1.0D - STACK_OPACITY, 1.0D / n));
+    }
+
+    /** La opacidad a la que converge una pila completa. Para tests y diagnóstico. */
+    public static double stackOpacity() {
+        return STACK_OPACITY;
     }
 
     /**

@@ -15,12 +15,16 @@ public enum LodLevel {
 
     HIGH(8, 16, 3),
     MEDIUM(4, 16, 3),
-    LOW(2, 32, 2),
-    MINIMAL(1, 64, 1);
+    LOW(2, 32, 2);
 
     // La celda no crece tanto como el ahorro tentaría: una celda de 128 bloques se ve como una
     // sábana rectangular en el cielo, no como una nube, por lejos que esté. El ahorro a distancia
     // sale de los slices, que es donde está el costo de relleno.
+    //
+    // Hubo un cuarto nivel, MINIMAL, con un corte y celdas de 64 bloques. Se quitó porque era
+    // inalcanzable —el tramo de LOW llegaba hasta el borde del domo y no dejaba lugar para otro—
+    // y porque, de haberse alcanzado, sus celdas de 64 bloques reintroducían exactamente el
+    // defecto que la 0.0.1 corrigió. Código muerto que además era código dañino.
     private final int slices;
     private final int cellSize;
     private final int layers;

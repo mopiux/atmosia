@@ -10,6 +10,7 @@ import dev.mopiux.atmosia.core.CloudLayerDef;
 import dev.mopiux.atmosia.core.DensityField;
 import dev.mopiux.atmosia.core.LodLevel;
 import dev.mopiux.atmosia.core.LodSelector;
+import dev.mopiux.atmosia.core.MotionPrefetch;
 import dev.mopiux.atmosia.core.NoiseField;
 import dev.mopiux.atmosia.core.QualityProfile;
 import dev.mopiux.atmosia.core.RegionKey;
@@ -54,6 +55,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
     private QualityProfile.Settings appliedQuality;
     private double appliedCoverageScale;
     private final VerticalFade verticalFade = VerticalFade.defaults();
+    private final MotionPrefetch prefetch = new MotionPrefetch();
     private final NoiseField noise;
     private final long seed;
 
@@ -144,6 +146,8 @@ public final class CloudRenderer implements CloudMetricsProvider {
         double speedScale = AtmosiaConfig.CLIENT.speedScale.get();
 
         Vec3 cameraPos = camera.getPosition();
+        this.prefetch.update(cameraPos.x, cameraPos.z, seconds);
+
         LodSelector selector = LodSelector.forRenderDistance(
                 Minecraft.getInstance().options.renderDistance().get(),
                 this.appliedQuality.distanceMultiplier(),
@@ -182,7 +186,14 @@ public final class CloudRenderer implements CloudMetricsProvider {
             double cloudCameraX = cameraPos.x - windX;
             double cloudCameraZ = cameraPos.z - windZ;
 
-            int radius = (int) Math.ceil(selector.maxDistance() / RegionKey.REGION_SIZE) + 1;
+            // Posición proyectada: la misma que la real mientras no se vaya rápido.
+            double aheadX = cloudCameraX + this.prefetch.leadX();
+            double aheadZ = cloudCameraZ + this.prefetch.leadZ();
+
+            // El barrido se agranda con el adelanto, si no no habría nada nuevo que encontrar
+            // adelante: las regiones que se quieren anticipar están, por definición, fuera del domo.
+            double scanRange = selector.maxDistance() + this.prefetch.leadLength();
+            int radius = (int) Math.ceil(scanRange / RegionKey.REGION_SIZE) + 1;
             RegionKey center = RegionKey.of(layerIndex, cloudCameraX, cloudCameraZ);
 
             for (int dz = -radius; dz <= radius; dz++) {
@@ -193,10 +204,21 @@ public final class CloudRenderer implements CloudMetricsProvider {
                     double toZ = key.centerZ() - cloudCameraZ;
                     double distance = Math.sqrt(toX * toX + toZ * toZ);
 
-                    LodLevel lod = selector.levelFor(distance);
-                    if (lod == null) {
+                    // Lo que se dibuja se decide con la posición real; lo que se genera, con la
+                    // proyectada. Adelantar también el dibujo movería el domo respecto de la
+                    // cámara y dejaría un borde a la vista por detrás.
+                    double aheadDX = key.centerX() - aheadX;
+                    double aheadDZ = key.centerZ() - aheadZ;
+                    double aheadDistance = Math.sqrt(aheadDX * aheadDX + aheadDZ * aheadDZ);
+
+                    LodLevel drawLod = selector.levelFor(distance);
+                    LodLevel wantedLod = selector.levelFor(aheadDistance);
+                    if (drawLod == null && wantedLod == null) {
                         continue;
                     }
+                    // El nivel a construir es el que va a hacer falta al llegar. Si no se va a
+                    // ningún lado, los dos valen lo mismo y no cambia nada.
+                    LodLevel lod = wantedLod != null ? wantedLod : drawLod;
                     if (layerIndex >= lod.layers()) {
                         // A distancia no se mantienen todas las capas (Sección 7.1): las de arriba
                         // son las que menos se notan al desaparecer, por eso se van primero.
@@ -204,8 +226,11 @@ public final class CloudRenderer implements CloudMetricsProvider {
                     }
 
                     double dot = distance < 1.0E-6D ? 1.0D : (toX * look.x() + toZ * look.z()) / distance;
-                    boolean visible = frustum == null ? dot > -0.35D : this.inFrustum(frustum, key, layer, windX, windZ);
-                    int priority = RegionPriority.classify(distance, selector, visible, dot);
+                    boolean visible = drawLod != null
+                            && (frustum == null ? dot > -0.35D : this.inFrustum(frustum, key, layer, windX, windZ));
+                    // La prioridad usa la distancia proyectada: es lo que pone adelante de la cola
+                    // lo que el jugador va a necesitar, en vez de lo que ya tiene encima.
+                    int priority = RegionPriority.classify(aheadDistance, selector, visible, dot);
 
                     RegionMesh mesh = this.cache.get(key);
                     if (mesh != null) {
@@ -226,7 +251,8 @@ public final class CloudRenderer implements CloudMetricsProvider {
                     }
 
                     if (RegionPriority.shouldGenerate(priority) && !this.queue.isInFlight(key)) {
-                        pending.add(new Pending(key, layer, lod, RegionPriority.sortKey(priority, distance)));
+                        pending.add(new Pending(key, layer, lod,
+                                RegionPriority.sortKey(priority, aheadDistance)));
                     }
                 }
             }
@@ -400,6 +426,7 @@ public final class CloudRenderer implements CloudMetricsProvider {
 
     /** Libera todo. Al cambiar de mundo o de configuración. */
     public void close() {
+        this.prefetch.reset();
         this.queue.shutdown();
         this.flushGeometry();
     }

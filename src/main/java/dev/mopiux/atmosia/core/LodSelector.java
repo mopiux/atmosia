@@ -12,17 +12,21 @@ public final class LodSelector {
     /** Umbrales orientativos de la Sección 7, configurables. */
     private final double highUntil;
     private final double mediumUntil;
-    private final double lowUntil;
+
+    /**
+     * Antes existía un {@code lowUntil} separado de {@code maxDistance}, pero valían siempre lo
+     * mismo: el tramo de LOW llegaba hasta el borde del domo. Eso dejaba al cuarto nivel sin tramo
+     * propio y, por lo tanto, sin usarse nunca. Se eliminaron los dos.
+     */
     private final double maxDistance;
 
     /** Nivel más detallado que este selector puede devolver, venga la distancia que venga. */
     private final LodLevel detailCap;
 
-    private LodSelector(double highUntil, double mediumUntil, double lowUntil, double maxDistance,
+    private LodSelector(double highUntil, double mediumUntil, double maxDistance,
                         LodLevel detailCap) {
         this.highUntil = highUntil;
         this.mediumUntil = mediumUntil;
-        this.lowUntil = lowUntil;
         this.maxDistance = maxDistance;
         this.detailCap = detailCap;
     }
@@ -52,7 +56,7 @@ public final class LodSelector {
         // largo, porque el borde queda dentro del campo de visión y el cielo se ve recortado.
         double max = Math.max(512.0D, worldDistance * multiplier);
         // Las proporciones replican los tramos del documento (300/800/1500 sobre 1500).
-        return new LodSelector(max * 0.20D, max * 0.53D, max, max, detailCap);
+        return new LodSelector(max * 0.20D, max * 0.53D, max, detailCap);
     }
 
     /** Escala fija, para tests y para la configuración manual. */
@@ -61,8 +65,7 @@ public final class LodSelector {
     }
 
     public static LodSelector fixed(double maxDistance, LodLevel detailCap) {
-        return new LodSelector(maxDistance * 0.20D, maxDistance * 0.53D, maxDistance, maxDistance,
-                detailCap);
+        return new LodSelector(maxDistance * 0.20D, maxDistance * 0.53D, maxDistance, detailCap);
     }
 
     public LodLevel detailCap() {
@@ -84,10 +87,7 @@ public final class LodSelector {
         if (distance <= this.mediumUntil) {
             return this.capped(LodLevel.MEDIUM);
         }
-        if (distance <= this.lowUntil) {
-            return this.capped(LodLevel.LOW);
-        }
-        return this.capped(LodLevel.MINIMAL);
+        return this.capped(LodLevel.LOW);
     }
 
     /**

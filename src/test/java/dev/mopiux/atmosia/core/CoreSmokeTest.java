@@ -38,6 +38,8 @@ public final class CoreSmokeTest {
         profiles();
         coverage();
         modes();
+        stackOpacity();
+        prefetch();
 
         System.out.println(fails == 0 ? "\nTODO OK" : "\n" + fails + " FALLAS");
         System.exit(fails == 0 ? 0 : 1);
@@ -85,6 +87,18 @@ public final class CoreSmokeTest {
                 capped.levelFor(1001.0D) == null, capped.levelFor(1001.0D));
         check("sin tope explicito no se recorta nada",
                 LodSelector.fixed(1000.0D).levelFor(10.0D) == LodLevel.HIGH, "");
+
+        // Habia un cuarto nivel con un tramo de ancho cero: no se usaba nunca.
+        LodSelector escala = LodSelector.forRenderDistance(16, 3.0D, LodLevel.HIGH);
+        java.util.Set<LodLevel> vistos = new java.util.LinkedHashSet<>();
+        for (double d = 0.0D; d <= escala.maxDistance(); d += 1.0D) {
+            LodLevel l = escala.levelFor(d);
+            if (l != null) {
+                vistos.add(l);
+            }
+        }
+        check("todos los niveles de LOD son alcanzables",
+                vistos.size() == LodLevel.values().length, vistos + " de " + LodLevel.values().length);
     }
 
     /** Cantidad de nubes: que el multiplicador llegue a la densidad y no se desborde. */
@@ -153,6 +167,147 @@ public final class CoreSmokeTest {
             describedProfiles &= !p.displayName().isBlank() && !p.description().isBlank();
         }
         check("todos los perfiles tienen nombre y explicacion", describedProfiles, "");
+    }
+
+    /** Opacidad de la pila: constante entre niveles, y nunca del todo opaca. */
+    static void stackOpacity() {
+        double objetivo = DensityField.stackOpacity();
+        check("la pila no llega a tapar el cielo", objetivo < 1.0D && objetivo > 0.5D, objetivo);
+
+        double peor = 0.0D;
+        for (LodLevel level : LodLevel.values()) {
+            float alfa = DensityField.sliceAlpha(level.slices());
+            double resto = 1.0D;
+            for (int i = 0; i < level.slices(); i++) {
+                resto *= (1.0D - alfa);
+            }
+            double acumulada = 1.0D - resto;
+            peor = Math.max(peor, Math.abs(acumulada - objetivo));
+            check("  " + level + " (" + level.slices() + " cortes) llega al objetivo",
+                    Math.abs(acumulada - objetivo) < 1.0E-6D, acumulada);
+        }
+        // Es el defecto que se veia volando: cada cambio de nivel cambiaba el brillo de la nube.
+        check("ningun cambio de nivel altera la opacidad", peor < 1.0E-6D, peor);
+
+        check("mas cortes, menos alfa cada uno",
+                DensityField.sliceAlpha(8) < DensityField.sliceAlpha(4)
+                        && DensityField.sliceAlpha(4) < DensityField.sliceAlpha(2), "");
+        check("un solo corte aporta toda la opacidad",
+                Math.abs(DensityField.sliceAlpha(1) - objetivo) < 1.0E-6D, DensityField.sliceAlpha(1));
+        check("cero cortes no rompe", DensityField.sliceAlpha(0) > 0.0F, DensityField.sliceAlpha(0));
+
+        // El compuesto visto desde abajo nunca debe caer por debajo del cielo: eso era la banda gris.
+        NoiseField ruido = new NoiseField(7L);
+        DensityField campo = new DensityField(ruido, CloudLayerDef.LOW);
+        double[] cielo = { 0.620D, 0.710D, 0.850D };
+        float[] color = { CloudLayerDef.LOW.red(), CloudLayerDef.LOW.green(), CloudLayerDef.LOW.blue() };
+        int cortes = LodLevel.HIGH.slices();
+        float alfa = DensityField.sliceAlpha(cortes);
+        double[] c = { cielo[0], cielo[1], cielo[2] };
+        double masOscuro = 1.0D;
+        for (int i = 0; i < cortes; i++) {
+            float sombra = campo.shade(1.0D, i, cortes);
+            for (int k = 0; k < 3; k++) {
+                c[k] = color[k] * sombra * alfa + c[k] * (1.0D - alfa);
+            }
+            masOscuro = Math.min(masOscuro, (c[0] + c[1] + c[2]) / 3.0D);
+        }
+        double brilloCielo = (cielo[0] + cielo[1] + cielo[2]) / 3.0D;
+        double caida = brilloCielo - masOscuro;
+
+        // Lo mismo con las constantes de la 0.2.1, para medir la mejora en vez de afirmarla.
+        double[] viejo = { cielo[0], cielo[1], cielo[2] };
+        double peorViejo = 1.0D;
+        for (int i = 0; i < cortes; i++) {
+            double sombra = (0.62D + (1.0D - 0.62D) * ((double) i / (cortes - 1))) * (1.0D - 0.12D);
+            for (int k = 0; k < 3; k++) {
+                viejo[k] = color[k] * sombra * 0.55D + viejo[k] * (1.0D - 0.55D);
+            }
+            peorViejo = Math.min(peorViejo, (viejo[0] + viejo[1] + viejo[2]) / 3.0D);
+        }
+        double caidaVieja = brilloCielo - peorViejo;
+
+        // Una nube vista desde abajo tiene que ser algo mas oscura que el cielo: si no, se lee como
+        // niebla. Lo que era defecto es la magnitud, que producia una banda gris marcada.
+        check("queda algo mas oscura que el cielo, como corresponde", caida > 0.0D,
+                String.format(Locale.ROOT, "%.3f", caida));
+        check("pero la caida es chica", caida < 0.08D, String.format(Locale.ROOT, "%.3f", caida));
+        check("y menos de la mitad que en la 0.2.1", caida < caidaVieja / 2.0D,
+                String.format(Locale.ROOT, "%.3f vs %.3f antes", caida, caidaVieja));
+    }
+
+    /** Prefetch direccional: que anticipe volando y que no haga nada caminando. */
+    static void prefetch() {
+        MotionPrefetch p = new MotionPrefetch();
+        // Caminar: 4,3 bloques por segundo.
+        double t = 0.0D;
+        double x = 0.0D;
+        for (int i = 0; i < 120; i++) {
+            t += 1.0D / 20.0D;
+            x += 4.3D / 20.0D;
+            p.update(x, 0.0D, t);
+        }
+        check("caminando no adelanta nada", p.leadLength() == 0.0D, p.leadLength());
+
+        // Elytra: 45 bloques por segundo en diagonal.
+        MotionPrefetch v = new MotionPrefetch();
+        t = 0.0D;
+        x = 0.0D;
+        double z = 0.0D;
+        double vx = 45.0D / Math.sqrt(2.0D);
+        for (int i = 0; i < 400; i++) {
+            t += 1.0D / 20.0D;
+            x += vx / 20.0D;
+            z += vx / 20.0D;
+            v.update(x, z, t);
+        }
+        check("volando estima la velocidad", Math.abs(v.speed() - 45.0D) < 1.0D, v.speed());
+        check("volando adelanta lo que corresponde",
+                Math.abs(v.leadLength() - 45.0D * MotionPrefetch.HORIZON_SECONDS) < 2.0D, v.leadLength());
+        check("el adelanto mantiene la direccion",
+                Math.abs(v.leadX() - v.leadZ()) < 1.0E-6D, v.leadX() + " / " + v.leadZ());
+
+        // Teletransporte: un salto enorme en un frame no debe disparar el adelanto.
+        MotionPrefetch tp = new MotionPrefetch();
+        tp.update(0.0D, 0.0D, 0.0D);
+        tp.update(1.0E7D, 1.0E7D, 0.05D);
+        check("un teletransporte no adelanta nada", tp.leadLength() == 0.0D, tp.leadLength());
+
+        // Velocidad alta pero creible: el tope manda, sin torcer la direccion.
+        MotionPrefetch rapido = new MotionPrefetch();
+        t = 0.0D;
+        x = 0.0D;
+        for (int i = 0; i < 400; i++) {
+            t += 1.0D / 20.0D;
+            x += 190.0D / 20.0D;
+            rapido.update(x, 0.0D, t);
+        }
+        check("a 190 b/s el tope se alcanza de verdad (no es codigo muerto)",
+                190.0D * MotionPrefetch.HORIZON_SECONDS > MotionPrefetch.MAX_LEAD, "");
+        check("el adelanto esta acotado",
+                Math.abs(rapido.leadLength() - MotionPrefetch.MAX_LEAD) < 1.0E-6D, rapido.leadLength());
+        check("y sigue apuntando a donde va", rapido.leadX() > 0.0D && rapido.leadZ() == 0.0D, "");
+
+        // Una pausa no se lee como movimiento.
+        MotionPrefetch pausa = new MotionPrefetch();
+        pausa.update(0.0D, 0.0D, 0.0D);
+        pausa.update(500.0D, 0.0D, 30.0D);
+        check("una pausa larga no deja velocidad residual", pausa.speed() == 0.0D, pausa.speed());
+
+        check("reset deja todo en cero", resetLimpio(), "");
+    }
+
+    static boolean resetLimpio() {
+        MotionPrefetch p = new MotionPrefetch();
+        double t = 0.0D;
+        double x = 0.0D;
+        for (int i = 0; i < 200; i++) {
+            t += 1.0D / 20.0D;
+            x += 45.0D / 20.0D;
+            p.update(x, 0.0D, t);
+        }
+        p.reset();
+        return p.speed() == 0.0D && p.leadLength() == 0.0D;
     }
 
     static void noise() {
@@ -281,7 +436,11 @@ public final class CoreSmokeTest {
                 LodSelector.forRenderDistance(32, 3.0).maxDistance());
 
         // Con el domo por defecto, ninguna celda llega a verse como una sábana en el cielo.
-        check("celda maxima acotada", LodLevel.MINIMAL.cellSize() <= 64, LodLevel.MINIMAL.cellSize());
+        int celdaMasGrande = 0;
+        for (LodLevel l : LodLevel.values()) {
+            celdaMasGrande = Math.max(celdaMasGrande, l.cellSize());
+        }
+        check("celda maxima acotada", celdaMasGrande <= 32, celdaMasGrande);
         check("piso minimo con render distance bajo",
                 LodSelector.forRenderDistance(2, 1.0).maxDistance() >= 256.0,
                 LodSelector.forRenderDistance(2, 1.0).maxDistance());
@@ -292,8 +451,8 @@ public final class CoreSmokeTest {
         check("cero en el borde", sel.distanceFade(1500.0) == 0.0F, sel.distanceFade(1500.0));
 
         int high = LodLevel.HIGH.maxQuadsPerRegionLayer(RegionKey.REGION_SIZE);
-        int minimal = LodLevel.MINIMAL.maxQuadsPerRegionLayer(RegionKey.REGION_SIZE);
-        check("MINIMAL cuesta mucho menos que HIGH", minimal * 100 < high, high + " vs " + minimal);
+        int barato = LodLevel.LOW.maxQuadsPerRegionLayer(RegionKey.REGION_SIZE);
+        check("el nivel mas barato cuesta mucho menos que HIGH", barato * 8 <= high, high + " vs " + barato);
     }
 
     static void fade() {

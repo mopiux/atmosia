@@ -25,15 +25,6 @@ import dev.mopiux.atmosia.core.RegionKey;
  */
 public final class RegionMeshBuilder {
 
-    /**
-     * Opacidad de un slice individual. Varios slices apilados acumulan opacidad, así que cada uno
-     * aporta poco: si cada slice fuera opaco, la nube sería un ladrillo.
-     */
-    private static final float SLICE_ALPHA_STACKED = 0.55F;
-
-    /** Con un solo slice no hay acumulación posible, así que tiene que aportar casi todo él. */
-    private static final float SLICE_ALPHA_SINGLE = 0.85F;
-
     private RegionMeshBuilder() {
     }
 
@@ -51,7 +42,9 @@ public final class RegionMeshBuilder {
         int cells = result.cellsPerSide();
         int slices = lod.slices();
         float cellSize = lod.cellSize();
-        float sliceAlpha = slices > 1 ? SLICE_ALPHA_STACKED : SLICE_ALPHA_SINGLE;
+        // El alfa por corte sale de cuántos cortes hay, para que la pila llegue siempre a la misma
+        // opacidad y el nivel de detalle no cambie el brillo de la nube al cruzar un umbral.
+        float sliceAlpha = DensityField.sliceAlpha(slices);
 
         BufferBuilder builder = new BufferBuilder(Math.max(256, result.estimatedQuads() * 4 * 16));
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
