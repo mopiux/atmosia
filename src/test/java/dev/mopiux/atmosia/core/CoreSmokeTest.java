@@ -43,6 +43,7 @@ public final class CoreSmokeTest {
         seams();
         terrazas();
         ordenDeMezcla();
+        bultos();
 
         System.out.println(fails == 0 ? "\nTODO OK" : "\n" + fails + " FALLAS");
         System.exit(fails == 0 ? 0 : 1);
@@ -308,6 +309,119 @@ public final class CoreSmokeTest {
             resto *= (1.0D - a);
         }
         return propio + 0.72D * resto;
+    }
+
+    /**
+     * La siembra de bultos de la tecnica SPRITES.
+     *
+     * Lo que importa verificar aca no es como se ve -eso no se puede medir sin dibujar- sino que la
+     * siembra sea determinista y que no haya ninguna estructura alineada con la grilla: si los
+     * bultos cayeran exactamente en una grilla, volveriamos a tener rectas, que es justamente lo
+     * que esta tecnica existe para evitar.
+     */
+    static void bultos() {
+        NoiseField n = new NoiseField(21L);
+        DensityField f = new DensityField(n, CloudLayerDef.LOW, 1.5D);
+
+        java.util.List<PuffField.Puff> a = new java.util.ArrayList<>();
+        java.util.List<PuffField.Puff> b = new java.util.ArrayList<>();
+        PuffField.seed(f, CloudLayerDef.LOW, 0.0D, 0.0D, RegionKey.REGION_SIZE, 21L, a::add);
+        PuffField.seed(f, CloudLayerDef.LOW, 0.0D, 0.0D, RegionKey.REGION_SIZE, 21L, b::add);
+
+        check("la siembra es determinista", a.size() == b.size() && !a.isEmpty(),
+                a.size() + " vs " + b.size());
+        boolean iguales = true;
+        for (int i = 0; i < a.size(); i++) {
+            iguales &= a.get(i).equals(b.get(i));
+        }
+        check("  y bulto por bulto", iguales, "");
+
+        // Ningun bulto puede quedar fuera de su capa: si sobresaliera, el borde de la capa se
+        // veria como un corte.
+        boolean dentro = true;
+        boolean alfaValido = true;
+        for (PuffField.Puff p : a) {
+            dentro &= p.y() >= CloudLayerDef.LOW.baseHeight() - 0.01F
+                    && p.y() <= CloudLayerDef.LOW.topHeight() + 0.01F;
+            alfaValido &= p.alpha() > 0.0F && p.alpha() <= 0.51F && p.radius() > 5.0F;
+        }
+        check("todos los bultos quedan dentro de su capa", dentro, "");
+        check("alfa y radio en rango", alfaValido, "");
+
+        // La prueba que de verdad importa: las posiciones NO pueden estar alineadas con la grilla
+        // de siembra. Si lo estuvieran, las columnas de bultos formarian rectas en perspectiva.
+        // Se mide el histograma de la posicion DENTRO de la celda de siembra. Si la siembra
+        // estuviera alineada, casi todos caerian en la misma cubeta. Repartido quiere decir que
+        // ninguna cubeta se lleva mucho mas que su parte.
+        int cubetas = PuffField.SEED_SPACING;
+        int[] hist = new int[cubetas];
+        java.util.List<PuffField.Puff> amplia = new java.util.ArrayList<>();
+        for (int rz = 0; rz < 3; rz++) {
+            for (int rx = 0; rx < 3; rx++) {
+                PuffField.seed(f, CloudLayerDef.LOW, rx * 256.0D, rz * 256.0D,
+                        RegionKey.REGION_SIZE, 21L, amplia::add);
+            }
+        }
+        for (PuffField.Puff p : amplia) {
+            int bin = (int) Math.floor(((p.x() % cubetas) + cubetas) % cubetas);
+            hist[Math.max(0, Math.min(cubetas - 1, bin))]++;
+        }
+        int mayor = 0;
+        for (int v : hist) {
+            mayor = Math.max(mayor, v);
+        }
+        double media = amplia.size() / (double) cubetas;
+        check("los bultos no se alinean con la grilla de siembra",
+                mayor < media * 2.5D,
+                String.format(Locale.ROOT, "cubeta mas cargada %d, media %.1f, sobre %d bultos",
+                        mayor, media, amplia.size()));
+
+        // El desorden tiene que estar repartido, no concentrado a un lado.
+        double suma = 0.0;
+        double peor = 0.0;
+        int muestras = 4000;
+        for (int i = 0; i < muestras; i++) {
+            double j = PuffField.jitter(i, i * 7L, i % 8, 21L);
+            suma += j;
+            peor = Math.max(peor, Math.abs(j));
+        }
+        check("el desorden esta centrado", Math.abs(suma / muestras) < 0.02D, suma / muestras);
+        check("y acotado a media celda", peor <= 0.5D, peor);
+
+        // El perfil vertical se anula en los extremos: es lo que afina la capa arriba y abajo.
+        check("el perfil vertical se anula en los bordes",
+                PuffField.verticalProfile(0.0D) < 1.0E-9D
+                        && PuffField.verticalProfile(1.0D) < 1.0E-9D
+                        && Math.abs(PuffField.verticalProfile(0.5D) - 1.0D) < 1.0E-9D, "");
+
+        // Mas densidad, mas bultos apilados: es lo que da el volumen.
+        check("la pila crece con la densidad",
+                PuffField.stackFor(0.05D) == 0
+                        && PuffField.stackFor(0.2D) >= 1
+                        && PuffField.stackFor(0.9D) > PuffField.stackFor(0.2D),
+                PuffField.stackFor(0.2D) + " -> " + PuffField.stackFor(0.9D));
+
+        // Dos regiones vecinas: la siembra no puede dejar un hueco ni un amontonamiento en el
+        // borde entre ellas, porque eso volveria a ser una recta.
+        java.util.List<PuffField.Puff> izq = new java.util.ArrayList<>();
+        java.util.List<PuffField.Puff> der = new java.util.ArrayList<>();
+        PuffField.seed(f, CloudLayerDef.LOW, 0.0D, 0.0D, RegionKey.REGION_SIZE, 21L, izq::add);
+        PuffField.seed(f, CloudLayerDef.LOW, RegionKey.REGION_SIZE, 0.0D, RegionKey.REGION_SIZE,
+                21L, der::add);
+        int cercaIzq = 0;
+        int cercaDer = 0;
+        for (PuffField.Puff p : izq) {
+            if (p.x() > RegionKey.REGION_SIZE - PuffField.SEED_SPACING) {
+                cercaIzq++;
+            }
+        }
+        for (PuffField.Puff p : der) {
+            if (p.x() < RegionKey.REGION_SIZE + PuffField.SEED_SPACING) {
+                cercaDer++;
+            }
+        }
+        check("el borde entre regiones vecinas tiene bultos de los dos lados",
+                cercaIzq > 0 && cercaDer > 0, cercaIzq + " / " + cercaDer);
     }
 
     /** Perfiles graficos: que los tres se ordenen y que el tope de detalle mande. */

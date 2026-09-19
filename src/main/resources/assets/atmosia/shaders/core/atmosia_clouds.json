@@ -1,0 +1,22 @@
+{
+    "blend": { "func": "add", "srcrgb": "srcalpha", "dstrgb": "1-srcalpha" },
+    "vertex": "atmosia_clouds",
+    "fragment": "atmosia_clouds",
+    "attributes": [ "Position", "UV0" ],
+    "samplers": [ { "name": "Sampler0" } ],
+    "uniforms": [
+        { "name": "ModelViewMat", "type": "matrix4x4", "count": 16,
+          "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "ProjMat", "type": "matrix4x4", "count": 16,
+          "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "AtmInverseViewProj", "type": "matrix4x4", "count": 16,
+          "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "AtmCameraPos", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+        { "name": "AtmSkyColor", "type": "float", "count": 3, "values": [ 0.6, 0.7, 0.95 ] },
+        { "name": "AtmCloudTint", "type": "float", "count": 3, "values": [ 1.0, 1.0, 1.0 ] },
+        { "name": "AtmSunDir", "type": "float", "count": 3, "values": [ 0.0, 1.0, 0.0 ] },
+        { "name": "AtmParams", "type": "float", "count": 4, "values": [ 1.0, 512.0, 0.0, 48.0 ] },
+        { "name": "AtmWind0", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] },
+        { "name": "AtmWind1", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] }
+    ]
+}

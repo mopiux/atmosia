@@ -3,6 +3,7 @@ package dev.mopiux.atmosia;
 import dev.mopiux.atmosia.core.CloudMode;
 import dev.mopiux.atmosia.core.LodLevel;
 import dev.mopiux.atmosia.core.QualityProfile;
+import dev.mopiux.atmosia.core.RenderTechnique;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -29,6 +30,7 @@ public final class AtmosiaConfig {
     public static final class Client {
 
         public final ForgeConfigSpec.EnumValue<CloudMode> cloudMode;
+        public final ForgeConfigSpec.EnumValue<RenderTechnique> renderTechnique;
         public final ForgeConfigSpec.EnumValue<QualityProfile> qualityProfile;
         public final ForgeConfigSpec.DoubleValue distanceMultiplier;
         public final ForgeConfigSpec.DoubleValue coverageScale;
@@ -66,6 +68,15 @@ public final class AtmosiaConfig {
                              "NONE: ninguna de las dos, cielo despejado.",
                              "VANILLA es el modo a usar para medir la linea base del benchmark.")
                     .defineEnum("cloudMode", CloudMode.ATMOSIA);
+
+            this.renderTechnique = builder
+                    .comment("Como se dibuja el cielo. Es la decision estructural del mod.",
+                             "SLICES: planos horizontales apilados. La tecnica original.",
+                             "SPRITES: bultos con textura que miran a la camara. Sin grilla.",
+                             "RAYMARCH: volumen por rayos, un solo dibujado. Sin geometria.",
+                             "Las tres usan el mismo campo de densidad y las mismas capas: lo",
+                             "unico que cambia es como se dibuja, asi que se pueden comparar.")
+                    .defineEnum("renderTechnique", RenderTechnique.SPRITES);
 
             this.standDownForShaderPacks = builder
                     .comment("Desactivarse cuando hay un shader pack activo.",

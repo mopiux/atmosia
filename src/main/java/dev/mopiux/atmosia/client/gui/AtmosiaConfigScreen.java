@@ -6,6 +6,7 @@ import dev.mopiux.atmosia.client.CloudRenderer;
 import dev.mopiux.atmosia.client.VanillaCloudSuppressor;
 import dev.mopiux.atmosia.core.CloudMode;
 import dev.mopiux.atmosia.core.QualityProfile;
+import dev.mopiux.atmosia.core.RenderTechnique;
 import java.util.Locale;
 import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
@@ -47,6 +48,7 @@ public final class AtmosiaConfigScreen extends Screen {
 
     private CloudMode mode;
     private QualityProfile profile;
+    private RenderTechnique technique;
 
     public AtmosiaConfigScreen(@Nullable Screen parent) {
         super(Component.literal("Atmosia"));
@@ -57,6 +59,7 @@ public final class AtmosiaConfigScreen extends Screen {
     protected void init() {
         this.mode = AtmosiaConfig.CLIENT.cloudMode.get();
         this.profile = AtmosiaConfig.CLIENT.qualityProfile.get();
+        this.technique = AtmosiaConfig.CLIENT.renderTechnique.get();
 
         int x = this.width / 2 - ROW_WIDTH / 2;
         int y = 34;
@@ -78,6 +81,19 @@ public final class AtmosiaConfigScreen extends Screen {
                         (button, value) -> {
                             this.profile = value;
                             AtmosiaConfig.CLIENT.qualityProfile.set(value);
+                        }));
+        y += ROW_SPACING;
+
+        // El selector de tecnica cambia en caliente: al cambiarlo, el renderer vivo se suelta y se
+        // arma el de la tecnica nueva. Es lo que permite compararlas mirando el mismo cielo.
+        this.addRenderableWidget(CycleButton.<RenderTechnique>builder(
+                        t -> Component.literal(t.displayName()))
+                .withValues(RenderTechnique.values())
+                .withInitialValue(this.technique)
+                .create(x, y, ROW_WIDTH, ROW_HEIGHT, Component.literal("Tecnica"),
+                        (button, value) -> {
+                            this.technique = value;
+                            AtmosiaConfig.CLIENT.renderTechnique.set(value);
                         }));
         y += ROW_SPACING;
 
@@ -115,6 +131,7 @@ public final class AtmosiaConfigScreen extends Screen {
     private void resetToDefaults() {
         AtmosiaConfig.CLIENT.cloudMode.set(CloudMode.ATMOSIA);
         AtmosiaConfig.CLIENT.qualityProfile.set(QualityProfile.MEDIUM);
+        AtmosiaConfig.CLIENT.renderTechnique.set(RenderTechnique.SPRITES);
         AtmosiaConfig.CLIENT.coverageScale.set(1.0D);
         // Se rearma la pantalla para que los controles muestren los valores nuevos.
         this.rebuildWidgets();
@@ -161,10 +178,35 @@ public final class AtmosiaConfigScreen extends Screen {
                 x, y, COLOR_VALUE, false);
         y += 11;
 
+        // La tecnica efectiva puede no ser la pedida: si se pidio ray marching y el shader no
+        // cargo, el mod usa sprites. Eso tiene que estar a la vista y no escondido en el log.
+        RenderTechnique pedida = this.technique;
+        RenderTechnique efectiva = AtmosiaClient.effectiveTechnique();
+        if (pedida != efectiva) {
+            graphics.drawString(this.font,
+                    Component.literal("El shader de " + pedida.displayName() + " no cargo. "
+                            + "Dibujando con " + efectiva.displayName() + "."),
+                    x, y, COLOR_WARN, false);
+        } else {
+            graphics.drawString(this.font,
+                    Component.literal("Tecnica: " + efectiva.displayName()),
+                    x, y, COLOR_VALUE, false);
+        }
+        y += 11;
+
         CloudRenderer renderer = AtmosiaClient.renderer();
-        String drawing = renderer == null
-                ? "Atmosia no esta dibujando"
-                : "Atmosia dibujando - " + renderer.activeRegions() + " regiones en memoria";
+        var puffs = AtmosiaClient.sprites();
+        String drawing;
+        if (renderer != null) {
+            drawing = "Dibujando - " + renderer.activeRegions() + " regiones en memoria";
+        } else if (puffs != null) {
+            drawing = "Dibujando - " + puffs.activeRegions() + " regiones de bultos, "
+                    + puffs.verticesLastFrame() / 4L + " bultos el ultimo frame";
+        } else if (AtmosiaClient.ray() != null) {
+            drawing = "Dibujando - un solo dibujado, sin geometria";
+        } else {
+            drawing = "Atmosia no esta dibujando";
+        }
         graphics.drawString(this.font, Component.literal(drawing), x, y, COLOR_VALUE, false);
         y += 11;
 

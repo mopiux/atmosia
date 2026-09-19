@@ -4,6 +4,20 @@ Sistema de nubes procedurales para Minecraft Forge 1.20.1. Reemplaza por complet
 de nubes vanilla por uno propio, procedural y optimizado. Sin sistema meteorológico todavía:
 esta primera etapa es una base de renderizado, no un simulador de clima.
 
+## Tres tecnicas de dibujo
+
+Desde la 0.4.0 el mod trae **tres formas distintas de dibujar el mismo cielo**, elegibles desde el menu sin reiniciar:
+
+| Tecnica | Como dibuja | Lineas rectas |
+|---|---|---|
+| **Planos apilados** | Planos horizontales translucidos, el cielo partido en regiones de 256 bloques | Sí, y son estructurales |
+| **Sprites** | Bultos con textura que miran a la camara, sin grilla de geometria | No |
+| **Ray marching** | Un solo dibujado; por cada pixel se avanza a pasos dentro del volumen | No, por construccion |
+
+Las tres usan **el mismo campo de densidad, las mismas tres capas, el mismo viento y la misma cobertura**. Lo unico que cambia es como se dibuja, asi que se pueden comparar mirando el mismo cielo.
+
+Por defecto viene **Sprites**.
+
 ## Estado actual
 
 **Código completo del renderer, sin compilar nunca.**

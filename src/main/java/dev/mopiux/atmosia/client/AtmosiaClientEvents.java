@@ -28,21 +28,32 @@ public final class AtmosiaClientEvents {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
-        CloudRenderer renderer = AtmosiaClient.renderer();
-        if (renderer == null || !AtmosiaClient.isActive()) {
+        if (!AtmosiaClient.isActive()) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) {
             return;
         }
-        renderer.render(
-                event.getPoseStack(),
-                event.getProjectionMatrix(),
-                event.getCamera(),
-                mc.level,
-                event.getPartialTick(),
-                event.getFrustum());
+
+        // Cada tecnica dibuja lo suyo. Solo una esta viva a la vez.
+        CloudRenderer planos = AtmosiaClient.renderer();
+        if (planos != null) {
+            planos.render(event.getPoseStack(), event.getProjectionMatrix(), event.getCamera(),
+                    mc.level, event.getPartialTick(), event.getFrustum());
+            return;
+        }
+        var puffs = AtmosiaClient.sprites();
+        if (puffs != null) {
+            puffs.render(event.getPoseStack(), event.getProjectionMatrix(), event.getCamera(),
+                    mc.level, event.getPartialTick());
+            return;
+        }
+        var rayos = AtmosiaClient.ray();
+        if (rayos != null) {
+            rayos.render(event.getPoseStack(), event.getProjectionMatrix(), event.getCamera(),
+                    mc.level, event.getPartialTick());
+        }
     }
 
     /** Revisa una vez por tick si corresponde estar activo: cambios de mundo, de config, de mods. */

@@ -3,6 +3,9 @@ package dev.mopiux.atmosia.client;
 import dev.mopiux.atmosia.AtmosiaConfig;
 import dev.mopiux.atmosia.bench.CloudMetricsProvider;
 import dev.mopiux.atmosia.core.CloudMode;
+import dev.mopiux.atmosia.core.RenderTechnique;
+import dev.mopiux.atmosia.client.ray.RayCloudRenderer;
+import dev.mopiux.atmosia.client.sprite.SpriteCloudRenderer;
 import javax.annotation.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -30,6 +33,16 @@ public final class AtmosiaClient {
 
     @Nullable
     private static CloudRenderer renderer;
+
+    @Nullable
+    private static SpriteCloudRenderer sprites;
+
+    @Nullable
+    private static RayCloudRenderer ray;
+
+    /** La tecnica con la que esta armado lo que hay vivo ahora mismo. */
+    @Nullable
+    private static RenderTechnique activeTechnique;
     private static boolean standDown;
     private static boolean reported;
 
@@ -44,8 +57,32 @@ public final class AtmosiaClient {
         return renderer;
     }
 
+    @Nullable
+    public static SpriteCloudRenderer sprites() {
+        return sprites;
+    }
+
+    @Nullable
+    public static RayCloudRenderer ray() {
+        return ray;
+    }
+
+    /**
+     * La tecnica efectiva, que puede no ser la pedida.
+     *
+     * Si se pidio ray marching y el shader no cargo, se usa sprites: un shader que no anda no puede
+     * dejar el cielo vacio sin explicacion.
+     */
+    public static RenderTechnique effectiveTechnique() {
+        RenderTechnique pedida = AtmosiaConfig.CLIENT.renderTechnique.get();
+        if (pedida == RenderTechnique.RAYMARCH && !RayCloudRenderer.shaderReady()) {
+            return RenderTechnique.SPRITES;
+        }
+        return pedida;
+    }
+
     public static boolean isActive() {
-        return renderer != null && !standDown;
+        return !standDown && (renderer != null || sprites != null || ray != null);
     }
 
     /**
@@ -82,12 +119,30 @@ public final class AtmosiaClient {
             return;
         }
 
-        if (renderer == null) {
+        RenderTechnique tecnica = effectiveTechnique();
+        if (activeTechnique != tecnica) {
+            shutdown();
+            activeTechnique = tecnica;
+        }
+
+        if (renderer == null && sprites == null && ray == null) {
             long seed = resolveSeed(level);
-            renderer = new CloudRenderer(seed);
-            CloudMetricsProvider.Registry.set(renderer);
-            LOGGER.info("Atmosia activo. Seed {}, supresion de vanilla: {}",
-                    seed, VanillaCloudSuppressor.strategy());
+            switch (tecnica) {
+                case SPRITES -> {
+                    sprites = new SpriteCloudRenderer(seed);
+                    CloudMetricsProvider.Registry.set(sprites);
+                }
+                case RAYMARCH -> {
+                    ray = new RayCloudRenderer(seed);
+                    CloudMetricsProvider.Registry.set(ray);
+                }
+                default -> {
+                    renderer = new CloudRenderer(seed);
+                    CloudMetricsProvider.Registry.set(renderer);
+                }
+            }
+            LOGGER.info("Atmosia activo. Tecnica {}, seed {}, supresion de vanilla: {}",
+                    tecnica.displayName(), seed, VanillaCloudSuppressor.strategy());
         }
     }
 
@@ -99,6 +154,12 @@ public final class AtmosiaClient {
             renderer = new CloudRenderer(seed);
             CloudMetricsProvider.Registry.set(renderer);
         }
+        if (sprites != null) {
+            long seed = sprites.seed();
+            sprites.close();
+            sprites = new SpriteCloudRenderer(seed);
+            CloudMetricsProvider.Registry.set(sprites);
+        }
     }
 
     /** Por que Atmosia cedio el cielo, o null si no cedio. */
@@ -109,10 +170,22 @@ public final class AtmosiaClient {
 
     /** Suelta el renderer. No toca el ajuste de nubes del juego: de eso decide {@link #refresh}. */
     public static void shutdown() {
+        boolean habia = renderer != null || sprites != null || ray != null;
         if (renderer != null) {
             renderer.close();
             renderer = null;
+        }
+        if (sprites != null) {
+            sprites.close();
+            sprites = null;
+        }
+        if (ray != null) {
+            ray.close();
+            ray = null;
+        }
+        if (habia) {
             CloudMetricsProvider.Registry.set(null);
+            activeTechnique = null;
             LOGGER.info("Atmosia desactivado.");
         }
     }
