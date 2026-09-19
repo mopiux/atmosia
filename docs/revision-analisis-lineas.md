@@ -1,118 +1,134 @@
 # Revisión del análisis externo sobre las líneas rectas
 
-*Respuesta punto por punto a `analisis-causas-lineas-rectas.md`, un diagnóstico hecho con Claude Sonnet sobre el código de la 0.2.4.*
+*Respuesta punto por punto a `analisis-causas-lineas-rectas.md`, un diagnóstico hecho con Claude Sonnet sobre el código de la 0.2.4 y sobre una grabación posterior al arreglo de la escalera de alturas.*
 
-*Este documento no propone cambios ni toca código. Verifica las afirmaciones del análisis contra el código real, contra las mediciones que ya existían y contra la cronología del repositorio, y reordena las hipótesis según lo que esa verificación deja en pie.*
+*Este documento no propone cambios ni toca código. Verifica las afirmaciones del análisis contra el código real y contra las mediciones existentes, y reordena las hipótesis según lo que esa verificación deja en pie.*
+
+> **Nota sobre la versión anterior de este documento.** La primera versión sostenía que el video analizado era anterior al arreglo de la escalera y que, por lo tanto, la premisa del análisis no estaba verificada. **Era falso.** La prueba de la 0.2.4 se hizo antes del análisis y con una grabación nueva (ver §1). Esa corrección cambia el veredicto y cambia el orden de las hipótesis.
 
 ---
 
 ## Veredicto en una página
 
-El documento analizado es bueno: está bien organizado, separa las hipótesis por probabilidad en vez de apostar a una sola, y propone pruebas que no requieren tocar código. Tres de sus observaciones son correctas y una de ellas señala un hueco real que yo había dejado abierto.
+El análisis es sólido. Su inferencia central —que si el bug sobrevive al arreglo de la escalera tiene que haber más de un mecanismo produciendo la misma firma visual— es correcta y está bien fundada. Sus tres hipótesis de categoría alta apuntan a lugares reales del código, y su crítica a la cobertura de las pruebas da en el blanco.
 
-Pero tiene un problema de base y un error técnico concreto.
+Queda una objeción técnica concreta y tres cosas para agregar.
 
 | | |
 |---|---|
-| **El problema de base** | Toda la estructura del documento cuelga de que el bug *persiste* en la 0.2.4. No se sabe. El video que analiza es anterior al arreglo, y nadie probó la 0.2.4 todavía. |
-| **El error técnico** | Su hipótesis número uno describe un mecanismo —opacidad que se acumula a lo largo del recorrido del rayo dentro de una celda— que no puede existir en planos de espesor cero. |
-| **Lo que rescata** | La crítica a la cobertura de los tests es correcta y se acepta entera. El cambio a interpolación quíntica es un punto real. El hueco del lado de celda 16→32 entre niveles es un hallazgo genuino. |
-| **Lo que le falta** | El dato que ya teníamos medido —crestas, no escalones— contradice su hipótesis principal. Y no usa el único discriminante que separa las familias de causas de una sola vez: el espaciado de las líneas. |
+| **La premisa** | **Se sostiene.** Verificada: el video del análisis es una grabación distinta y posterior al arreglo. |
+| **La objeción** | El mecanismo que da su hipótesis principal —opacidad que se integra a lo largo del recorrido del rayo dentro de la celda— no puede existir en planos de espesor cero. Pero **su conclusión sobrevive con otro mecanismo**, que además la explica mejor (§3). |
+| **Lo que acierta** | La crítica a los tests. El hueco del lado de celda 16→32 entre niveles. El cambio a interpolación quíntica. |
+| **Lo que le falta** | Una prueba de tres vías que separa las familias de causas sin tocar código ni hacer cuentas, y que ninguna de sus pruebas propuestas cubre (§5.1). |
 
 ---
 
-## 1. La cronología: el video es anterior al arreglo
+## 1. La premisa: verificada
 
 El análisis se apoya en esta frase, que es la bisagra de todo el resto:
 
 > *"Si el síntoma persiste en 0.2.4 con esa causa ya cerrada, lo más lógico es que exista más de un mecanismo generando el mismo tipo de banda."*
 
-**El síntoma no se sabe si persiste en la 0.2.4.**
+**El síntoma persiste en la 0.2.4.** La prueba se hizo antes del análisis, y la grabación que el análisis usa es de esa prueba, no del material anterior.
 
-El video analizado es el que provocó el arreglo de la escalera de alturas, no una prueba posterior a él. La secuencia en el repositorio es:
+La comprobación es directa: el video del material previo y el que el análisis describe en su encabezado no son el mismo archivo.
 
-| Orden | Qué |
-|---|---|
-| 1 | Se graba el video y se toman los benchmarks (`frames-fast_travel-20260919-004945`) |
-| 2 | Se entregan junto con el reporte de que el bug seguía presente |
-| 3 | Se hace el análisis de medición y se identifica la costura de LOD |
-| 4 | **Commit `ff99077`** — la escalera de alturas compartida (0.2.4) |
-| 5 | El mod no se volvió a probar |
+| | Grabación anterior | Grabación del análisis |
+|---|---|---|
+| Duración | 14,72 s | **17,94 s** |
+| Resolución | 1918 × 1012 | 1918 × **1010** |
+| Cuadros por segundo | 30 | 30 |
 
-El análisis externo leyó el **código de la 0.2.4** y miró **fotogramas de la 0.2.3**. Es un cruce razonable si no se tiene la cronología a la vista, pero invalida la premisa de la que cuelga el resto del razonamiento.
+Duraciones distintas y alturas de imagen distintas: son dos capturas separadas, y la del análisis es posterior al commit `ff99077`.
 
-### 1.1 Y la evidencia disponible la explica la causa ya corregida
+La consecuencia es que **la escalera de alturas cerró una causa y no cerró el defecto**, y que la inferencia de causas múltiples está bien planteada.
 
-Hay algo que agrava el problema anterior. La medición que se hizo sobre esos mismos fotogramas (Método 9 del inventario) dio:
+### 1.1 Lo que no se hereda de la tanda anterior
 
-> Residuos de entre **3 y 8 niveles de gris**, con anchos de **4 a 6 píxeles**.
+Con la premisa en pie hay que ser cuidadoso con lo contrario: **las mediciones de píxeles de la tanda anterior no se transfieren.**
 
-La causa que ya se corrigió predecía exactamente eso. El alfa acumulado en la costura subía de 0,92 a 0,994: un **+8 % de opacidad en una banda fina, larga y recta**. Poco contraste, forma de cresta, unos pocos píxeles de ancho.
+El Método 9 midió, sobre la grabación vieja, residuos de 3 a 8 niveles de gris con anchos de 4 a 6 píxeles. Esa medición describe un cielo que contenía una causa que hoy ya no está —la costura con planos de más, que aportaba un +8 % de opacidad en una banda fina—. No se puede usar para caracterizar lo que queda.
 
-O sea: **la evidencia visual que tenemos queda completamente explicada por la causa que ya cerramos**. Construir una teoría de causas múltiples sobre esa misma evidencia, sin una prueba posterior al arreglo, es adelantarse.
+**Hay que volver a medir sobre la grabación nueva**, y hasta que eso pase, cualquier afirmación sobre la *forma* del defecto actual (cresta contra escalón, ancho, contraste) es una conjetura. Esto vale tanto para el análisis externo como para este documento.
 
 ---
 
-## 2. El error técnico: la hipótesis 3.1 no puede funcionar así
+## 2. La objeción: el mecanismo de la hipótesis 3.1
 
-Es la hipótesis que el documento pone primera, y el mecanismo que describe no existe en este renderer.
+Es la hipótesis que el análisis pone primera, y el mecanismo que describe no existe en este renderer.
 
 > *"El 'largo óptico' que recorre el rayo de vista dentro de la celda antes de salir de su rectángulo crece muchísimo respecto de mirarla de frente. Eso significa que, aunque el alfa por corte sea bajo, la opacidad acumulada a lo largo de ese tramo del rayo puede ser mucho más alta..."*
 
-Eso es cierto en **ray marching sobre un volumen**, donde la opacidad se integra a lo largo del recorrido y el ángulo de entrada cambia cuánto medio atraviesa el rayo.
+Eso es cierto en **ray marching sobre un volumen**, donde la opacidad se integra a lo largo del recorrido y el ángulo de entrada determina cuánto medio atraviesa el rayo.
 
-Acá los cortes son **planos horizontales de espesor cero**. Un rayo cruza un plano exactamente una vez, venga del ángulo que venga, y la mezcla aporta exactamente el alfa de esa celda. No hay recorrido interno que integrar.
+Acá los cortes son **planos horizontales de espesor cero**. Un rayo cruza un plano exactamente una vez, venga del ángulo que venga, y la mezcla aporta exactamente el alfa de la celda que cruzó. No hay recorrido interno que integrar.
 
-**La opacidad acumulada de la pila es 0,92 mirando derecho hacia arriba y 0,92 mirando al ras.** No depende del ángulo, por construcción: el alfa por corte se deriva de la cantidad de cortes justamente para que la pila converja siempre al mismo valor.
+**La opacidad acumulada de la pila es 0,92 mirando derecho hacia arriba y 0,92 mirando al ras.** No depende del ángulo por construcción: el alfa por corte se deriva de la cantidad de cortes justamente para que la pila converja siempre al mismo valor.
 
-### 2.1 Lo que sí cambia en ángulo rasante es lo contrario
-
-Los ocho cruces del rayo con los ocho cortes ocurren a **ocho posiciones horizontales distintas**, y en ángulo rasante esas posiciones están muy separadas:
+Lo que sí cambia en ángulo rasante es otra cosa, y va en la dirección opuesta. Los ocho cruces del rayo con los ocho cortes ocurren a ocho posiciones horizontales distintas, muy separadas entre sí:
 
 ```
 separación horizontal = espesor de la capa / tan(elevación)
 ```
 
-Para la capa baja (16 bloques de espesor) con la cámara a 5° de elevación: **183 bloques**. Son once celdas de 16 bloques entre el primer cruce y el último.
-
-En ángulo rasante el compuesto **promedia celdas muy separadas entre sí**. Eso *difumina* la silueta de cada celda individual en vez de endurecerla — el efecto contrario al que la hipótesis necesita.
-
-### 2.2 Y la rasterización tampoco la ayuda
-
-Dentro de una región, las celdas comparten sus aristas **exactamente**. Las coordenadas son locales a la región y múltiplos enteros de 16 o 32, todos exactamente representables en `float`:
-
-```java
-float x0 = cx * cellSize;
-float x1 = x0 + cellSize;      // x1 de una celda == x0 de la vecina, bit a bit
-```
-
-La regla de relleno de OpenGL garantiza que una arista compartida exacta queda cubierta **una sola vez**: no hay doble cobertura ni grieta entre celdas vecinas del mismo nivel de detalle.
-
-La consecuencia es una predicción falsable: un borde de celda puede producir un **escalón** de brillo, nunca una **cresta**. Y lo que se midió fueron crestas (ver §4.1).
+Para la capa baja (16 bloques de espesor) a 5° de elevación: **183 bloques**. Once celdas de 16 bloques entre el primer cruce y el último. El compuesto promedia celdas muy separadas, lo cual *difumina* la silueta de cada celda individual en vez de endurecerla.
 
 ---
 
-## 3. Lo que el análisis acierta
+## 3. Pero la conclusión de 3.1 sobrevive, con otro mecanismo
 
-### 3.1 La crítica a los tests es correcta y se acepta entera
+Descartar el mecanismo no descarta la hipótesis, y en este caso hay un mecanismo distinto que llega a la misma conclusión y además explica mejor lo observado.
 
-> *"Las pruebas de `CoreSmokeTest` son matemáticas puras, no dibujan nada... Nunca instancian `RegionMeshBuilder`, nunca arman un `VertexBuffer`, nunca simulan una cámara en ángulo rasante. Es una cobertura muy sólida del algoritmo, pero cero cobertura del resultado visual final."*
+**Aliasing de una grilla regular en incidencia rasante.**
 
-Es exactamente así. Lo verifiqué leyendo el test: `seams()` llama a `sliceHeight`, `sliceThreshold`, `sliceT` y `shade` con datos sintéticos y comprueba cuatro propiedades algebraicas —alturas distintas por nivel, subconjunto exacto entre niveles vecinos, unión que no crece, y umbral y sombreado iguales en cortes coplanares—. Ni una sola de ellas toca geometría dibujada.
+Los ingredientes están todos presentes:
 
-Es cobertura sólida del algoritmo y cobertura cero del resultado, que es donde vive esta clase de defecto.
+- La grilla de celdas es **perfectamente regular**: 16 bloques, sin variación.
+- Cada borde de celda es una **discontinuidad dura de alfa**: el alfa es constante en toda la superficie del cuadrilátero y salta al valor de la vecina en la arista. No hay degradado.
+- **No hay textura, así que no hay mipmapping**: nada filtra el detalle que cae por debajo del tamaño del píxel.
+- En ángulo rasante, una sola fila de píxeles de la pantalla abarca **decenas o cientos de bloques** en profundidad, o sea muchas celdas por píxel.
+- Y hay **ocho grillas superpuestas**, una por corte, desplazadas en profundidad unas respecto de otras.
 
-### 3.2 El hueco del lado de celda entre niveles es real
+Una grilla regular muestreada por otra grilla regular a través de una transformación proyectiva produce **moiré**: familias de bandas que no están en el mundo, sino que nacen del batido entre las dos frecuencias.
 
-Su hipótesis 3.3 señala dos cosas que la escalera de alturas no cubre. La primera —que el lado fino conserva cortes que el grueso no tiene— es cierta pero acotada: la unión de alturas no crece, que es lo que evitaba el +8 % de opacidad.
+Ese mecanismo predice, sin forzar nada:
 
-La segunda es un hallazgo genuino:
+| Lo observado | Lo que predice el moiré |
+|---|---|
+| Líneas convergiendo a un punto de fuga | Sí: el batido de una grilla horizontal se alinea con sus direcciones principales |
+| No limitado a una costura de 256 bloques | Sí: aparece en cualquier parte del cielo con incidencia suficiente |
+| Contrastes distintos entre líneas vecinas | Sí: es característico del batido |
+| Aparece en ángulo rasante y no mirando hacia arriba | Sí: es el régimen donde hay muchas celdas por píxel |
+
+O sea: **la hipótesis del análisis estaba bien elegida y mal explicada.** En la primera versión de este documento la bajé a probabilidad baja apoyándome en el error del mecanismo, y eso fue un error mío: la conclusión es independiente del argumento que la sostenía.
+
+### 3.1 Lo que cambia es el arreglo
+
+La diferencia práctica entre los dos mecanismos está en qué corrección corresponde.
+
+Si fuera acumulación óptica, habría que tocar la opacidad. Si es aliasing de una discontinuidad dura, la corrección es **eliminar la discontinuidad**: que el alfa varíe dentro del cuadrilátero en vez de ser constante, interpolado entre los cuatro vértices a partir de las densidades de las celdas vecinas.
+
+Eso convierte la silueta de la nube en algo continuo, sin aristas de alfa, y le quita al aliasing el borde duro del que se alimenta. Tiene un costo: hay que tener la densidad en las **esquinas** de la celda y no solo en su centro —promediando las cuatro celdas vecinas, o muestreando el ruido en los vértices—, lo cual es barato pero no gratis.
+
+---
+
+## 4. Lo que el análisis acierta
+
+### 4.1 La crítica a los tests, entera
+
+> *"Las pruebas de `CoreSmokeTest` son matemáticas puras, no dibujan nada... Nunca instancian `RegionMeshBuilder`, nunca arman un `VertexBuffer`, nunca simulan una cámara en ángulo rasante."*
+
+Exacto. `seams()` llama a `sliceHeight`, `sliceThreshold`, `sliceT` y `shade` con datos sintéticos y comprueba cuatro propiedades algebraicas: alturas distintas por nivel, subconjunto exacto entre niveles vecinos, unión que no crece, y umbral y sombreado iguales en cortes coplanares. Ninguna toca geometría dibujada.
+
+Cobertura sólida del algoritmo y cobertura cero del resultado, que es donde vive esta clase de defecto. Y el defecto que sobrevivió al arreglo es la demostración: los tests pasan en verde sobre un cielo que sigue teniendo líneas.
+
+### 4.2 El hueco del lado de celda entre niveles es real
 
 > *"El tamaño de celda también cambia entre Medio y Bajo (16 contra 32 bloques)... el lado Bajo evalúa el mismo ruido en una grilla más gruesa, así que puede o no activar una celda donde el lado Medio sí la activa. Es una discontinuidad de **forma** entre dos regiones vecinas."*
 
-Correcto, y no lo cubre ninguna corrección actual. Tampoco hay mezcla entre niveles que suavice la transición: el cambio de malla es completo. Es un hueco que yo dejé abierto.
+Correcto y no cubierto por ninguna corrección actual. Tampoco hay mezcla entre niveles que suavice la transición: el cambio de malla es completo. Es un hueco que quedó abierto de mi lado.
 
-### 3.3 La interpolación quíntica es un punto válido
+### 4.3 La interpolación quíntica es un punto válido
 
 `NoiseField.valueNoise` usa el suavizado cúbico clásico:
 
@@ -120,63 +136,62 @@ Correcto, y no lo cubre ninguna corrección actual. Tampoco hay mezcla entre niv
 double sx = fx * fx * (3.0D - 2.0D * fx);      // 3t² − 2t³
 ```
 
-Deja continuos el valor y la primera derivada, pero **no la segunda**. Es una limitación conocida, y es literalmente la razón por la que Perlin la reemplazó por una quíntica (`6t⁵ − 15t⁴ + 10t³`) en su *Improved Noise* de 2002. El cambio es de una línea y no tiene costo apreciable.
+Deja continuos el valor y la primera derivada, pero **no la segunda**. Es la razón por la que Perlin la reemplazó por una quíntica (`6t⁵ − 15t⁴ + 10t³`) en su *Improved Noise* de 2002. El cambio es de una línea y no tiene costo apreciable.
 
-**Y le falta su propio mejor argumento.** El umbral **amplifica** ese pliegue:
+**Y le falta su propio mejor argumento.** El umbral amplifica ese pliegue:
 
 ```java
 alfa = min(1, (densidad − umbral) / 0,22)
 ```
 
-Dividir por 0,22 multiplica por **4,5** cualquier diferencia de pendiente que traiga la densidad. Un pliegue que en el mapa de densidad es casi imperceptible entra al alfa multiplicado por cuatro y medio. Ese es un argumento mucho más fuerte a favor de la hipótesis que el que el documento usa.
+Dividir por 0,22 multiplica por **4,5** cualquier diferencia de pendiente que traiga la densidad. Un pliegue casi imperceptible en el mapa de densidad entra al alfa multiplicado por cuatro y medio.
 
-### 3.4 Donde se pasa de la raya
+### 4.4 Donde sí se pasa de la raya
 
-> *"El Método 11 de la tanda anterior ya midió esto sin llamarlo así: encontró filas y columnas puntuales con curvatura de 1,8 a 2,0 veces la media. Eso es exactamente la firma de una discontinuidad de segunda derivada."*
+> *"El Método 11 ya midió esto sin llamarlo así: encontró curvatura de 1,8 a 2,0 veces la media. Eso es exactamente la firma de una discontinuidad de segunda derivada."*
 
-No lo es. Un cociente de 1,8–2,0 entre el máximo y la media, sobre 600 filas y 600 columnas de un campo aleatorio suave, es fluctuación estadística normal. Fue un **resultado nulo**.
+No lo es. Un cociente de 1,8–2,0 entre el máximo y la media, sobre 600 filas y 600 columnas de un campo aleatorio suave, es fluctuación estadística normal. Fue un resultado nulo, anotado sin veredicto en el inventario porque ese documento se pidió sin conclusiones. Leerlo como confirmación invierte el signo del dato.
 
-En el inventario de métodos quedó anotado sin veredicto porque ese documento se pidió explícitamente sin conclusiones. Leerlo como confirmación es invertir el signo del dato.
+La hipótesis de la quíntica es buena igual. Simplemente no tiene esa evidencia a favor.
 
 ---
 
-## 4. Lo que al análisis le falta
+## 5. Lo que le falta
 
-### 4.1 El discriminante que ya estaba medido: cresta contra escalón
+### 5.1 La prueba de tres vías
 
-El Método 9 midió las anomalías con **residuo de mediana móvil**, que por construcción detecta crestas: resta a cada fila su propia mediana local y busca los máximos del residuo. Encontró crestas.
+Ninguna de las pruebas propuestas distingue las familias de causas, y hay una que lo hace de una sola vez, sin F3, sin cuentas y sin tocar código.
 
-Eso parte las hipótesis en dos familias con predicciones opuestas:
+**Cada familia se comporta distinto frente a dos movimientos independientes: girar la cámara sin moverse, y quedarse quieto dejando correr el viento.**
 
-| Forma predicha | Qué significa | Hipótesis que la predicen |
+| Familia | Al girar solo la cámara | Al quedarse quieto (viento corriendo) |
 |---|---|---|
-| **Cresta** | Opacidad de más en una banda angosta, que vuelve al nivel de base a ambos lados | Costura con planos de más *(ya corregida)*, pliegue del ruido, doble cobertura sub-píxel |
-| **Escalón** | El brillo cambia de nivel y se queda en el nuevo | Silueta de celda, cambio de lado de celda entre niveles |
+| **Aliasing / moiré** (grilla de celdas) | Las líneas **nadan**: cambian de lugar, de separación, aparecen y desaparecen | Cambian, pero no acompañando a las nubes |
+| **Red de ruido** o **bordes de región** | Quedan **ancladas al cielo**: la línea sigue sobre la misma formación | **Derivan junto con las nubes**: viven en espacio de nube |
+| **Costuras de nivel de detalle** | Quedan ancladas **al jugador**, no al cielo: son anillos centrados en vos | **No derivan**: se quedan a la misma distancia tuya mientras las nubes pasan por debajo |
 
-**La hipótesis que el análisis pone primera predice escalón. Lo medido fue cresta.**
+Tres comportamientos distintos y mutuamente excluyentes, observables a ojo en menos de un minuto de juego.
 
-### 4.2 Las costuras de LOD son arcos, no un abanico
+### 5.2 Las costuras de nivel de detalle son arcos, no un abanico
 
-El documento apoya varias hipótesis en un patrón de líneas convergiendo a un punto:
+El análisis apoya varias hipótesis en el patrón de líneas convergiendo a un punto:
 
 > *"se ve un patrón muy nítido de líneas convergiendo en un solo punto (forma de 'V' o abanico), que es exactamente la proyección en perspectiva de un conjunto de líneas paralelas en el mundo"*
 
-La primera mitad es correcta: un abanico que converge a un punto de fuga son **líneas paralelas en el mundo**. La consecuencia que no saca es que eso **descarta** una de sus propias hipótesis de categoría alta.
+La primera mitad es correcta. La consecuencia que no saca es que eso pesa **en contra** de una de sus propias hipótesis de categoría alta: los tramos de nivel de detalle son **anillos alrededor del jugador**, así que sus costuras no son rectas paralelas sino **arcos concéntricos**, que en pantalla cruzan el abanico en vez de formarlo.
 
-Los tramos de nivel de detalle son **anillos alrededor del jugador**. Sus costuras no son rectas paralelas: son **arcos concéntricos**, que en pantalla cruzan el abanico en vez de formarlo. Si el patrón observado es de verdad un abanico convergente, apunta a una familia alineada con una grilla —celdas, bordes de región o red de ruido— y en contra de las costuras de LOD.
+### 5.3 Por qué unas líneas se ven y otras no
 
-### 4.3 Por qué unas líneas se ven nítidas y otras no
+El difuminado de 183 bloques de §2 ocurre **a lo largo de la dirección de vista**:
 
-El difuminado de 183 bloques de §2.1 ocurre **a lo largo de la dirección de vista**. De ahí sale una explicación del abanico mejor que la del documento:
-
-- Una línea que corre aproximadamente **paralela** a hacia dónde mirás se difumina **a lo largo de sí misma**, y queda intacta.
+- Una línea aproximadamente **paralela** a hacia dónde mirás se difumina a lo largo de sí misma, y queda intacta.
 - Una línea **perpendicular** se difumina a través de sí misma, y se borra.
 
-Por eso se ven solo las que apuntan al punto de fuga. Y eso le quita al abanico todo valor como evidencia a favor de una hipótesis en particular: el filtro vale igual para bordes de celda, bordes de región y red de ruido.
+Por eso sobreviven solo las que apuntan al punto de fuga. Y eso le quita al abanico valor como evidencia a favor de una hipótesis en particular: el filtro vale igual para bordes de celda, bordes de región y red de ruido.
 
-### 4.4 El separador definitivo: el espaciado
+### 5.4 El espaciado, como prueba de respaldo
 
-Ninguna de las pruebas propuestas mide lo único que separa las tres familias candidatas de una sola vez. Cada fuente deja líneas a una distancia distinta **en el mundo**:
+Si la prueba de §5.1 apunta a una causa anclada al mundo, el espaciado termina de identificarla. Cada fuente deja líneas a una distancia propia:
 
 | Fuente | Separación en bloques |
 |---|---|
@@ -186,40 +201,43 @@ Ninguna de las pruebas propuestas mide lo único que separa las tres familias ca
 | Red de ruido, capa media (escala 420) | 52,5 · 105 · 210 · 420 |
 | Red de ruido, capa alta (escala 620) | 77,5 · 155 · 310 · 620 |
 | Bordes de región | 256 |
-| Costuras de nivel de detalle | *no aplica: arcos, no rectas paralelas* |
 
-Con la posición del jugador en pantalla (F3) y dos líneas del fotograma alcanza para descartar casi todo de una.
+Con una salvedad que importa: **si la causa es el aliasing de §3, el espaciado en pantalla no va a corresponder a ninguna de estas cifras**, porque las bandas de moiré son un batido y no están en el mundo. Que las cuentas no cierren con ninguna fila de la tabla es, en sí mismo, un resultado informativo.
 
 ---
 
-## 5. Ranking comparado
+## 6. Ranking comparado
 
-| Hipótesis | El análisis | Esta revisión | Por qué cambia |
+| Hipótesis | El análisis | Esta revisión | Por qué |
 |---|---|---|---|
-| Silueta dura de celda en ángulo rasante | **1ª — Alta** | **Baja** | El mecanismo no existe en planos de espesor cero; las aristas compartidas son exactas y no dejan grieta; predice escalón y lo medido fue cresta |
-| Pliegue del ruido (cúbica en vez de quíntica) | 2ª — Alta | **1ª**, si el bug persiste | Real, amplificado ×4,5 por el umbral, y se corrige con una línea. La "confirmación" que cita es un resultado nulo |
-| Costura de LOD abierta (celda 16→32) | 3ª — Alta | **2ª** | Hueco real y no cubierto. Pero deja arcos, no el abanico que el propio documento describe |
-| Precisión sub-píxel entre regiones | Media | **3ª** | Puede dar cresta o surco según hacia dónde redondee. Espaciado de 256 bloques, fácil de verificar |
+| Silueta dura de celda en ángulo rasante | **1ª — Alta** | **1ª** | Se mantiene arriba, pero por aliasing de una grilla regular sin filtrado (§3), no por acumulación óptica. Cambia el arreglo que corresponde |
+| Costura de nivel de detalle abierta (celda 16→32) | 3ª — Alta | **2ª** | Hueco real y no cubierto. Deja arcos, no abanico, lo cual la prueba de §5.1 distingue de inmediato |
+| Pliegue del ruido (cúbica en vez de quíntica) | 2ª — Alta | **3ª** | Real y amplificado ×4,5 por el umbral, pero la "confirmación" que cita es un resultado nulo. Se corrige con una línea, así que conviene hacerlo igual |
+| Precisión sub-píxel entre regiones | Media | De acuerdo | Solo puede producir líneas cada 256 bloques; la prueba de §5.1 la agrupa con la red de ruido y el espaciado la separa |
 | Sin orden de profundidad dentro de la región | Media | De acuerdo | Real, pero produce una diferencia uniforme de brillo, no una línea |
-| Banding de color de 8 bits | Media | De acuerdo | El propio documento lo baja bien: la firma esperada son bandas siguiendo el degradé del cielo |
-| Malla vieja durante una transición de LOD | Media | De acuerdo | Solo relevante combinado con otra causa |
+| Banding de color de 8 bits | Media | De acuerdo | El propio análisis lo baja bien |
+| Malla vieja durante una transición de nivel | Media | De acuerdo | Solo relevante combinado con otra causa |
 | Categoría 1 completa | Baja | De acuerdo | Correctamente descartados |
 
-Una nota sobre la hipótesis de los "cuadrados que se recargan": el documento la vincula a la silueta de celda vista de frente. Ese vínculo se cae junto con el mecanismo de §2, pero la observación de fondo —que conviene investigar los dos síntomas juntos— sigue siendo razonable.
+Sobre el segundo síntoma (los cuadrados que se recargan): el análisis lo vincula a la misma causa vista desde otro ángulo. Con el mecanismo corregido de §3 el vínculo se mantiene e incluso se refuerza — un borde duro de alfa se ve como línea de canto y como cuadrado de frente, y en los dos casos el origen es la discontinuidad, no el ángulo.
 
 ---
 
-## 6. Qué hacer, en orden
+## 7. Qué hacer, en orden
 
-**Primero: probar la 0.2.4.** Mismo ángulo rasante del video. Es una tarde de juego y decide si hay algo que investigar. Si las líneas desaparecieron, todo lo anterior describe causas hipotéticas de un defecto que ya no existe.
+1. **La prueba de tres vías de §5.1.** Un minuto de juego, sin herramientas. Separa aliasing de causa anclada al mundo de costura de nivel de detalle, que es la bifurcación que decide todo lo demás.
 
-**Si siguen: medir el espaciado antes de tocar código.** Con F3 y dos líneas del fotograma, contra la tabla de §4.4. Es el único dato que separa las familias, y no aparece entre las pruebas propuestas.
+2. **Volver a medir los fotogramas de la grabación nueva** (§1.1). Forma del perfil, ancho, contraste y separación en pantalla. Lo de la tanda anterior describe un cielo que ya no existe.
 
-**En cualquiera de los dos casos, dos cosas valen igual:**
+3. **Según lo que salga de 1 y 2**, atacar una sola causa por vez y volver a grabar en el mismo ángulo entre una y otra. Tres correcciones juntas sobre un defecto con causa desconocida no se pueden atribuir después.
 
-1. **Cambiar la interpolación del ruido a quíntica.** Una línea, sin costo medible, elimina una clase entera de artefacto — se esté manifestando ahora o no.
-2. **Cerrar el hueco del lado de celda entre Medio y Bajo.** Es real y quedó abierto.
+**Independientemente del resultado**, dos cosas valen igual y son baratas:
+
+- **Cambiar la interpolación del ruido a quíntica.** Una línea, sin costo medible, elimina una clase entera de artefacto.
+- **Cerrar el hueco del lado de celda entre Medio y Bajo.**
+
+Y una tercera que vale la pena tener presente aunque no se haga ahora: **los tests no cubren nada de lo que está fallando.** Mientras la verificación siga siendo algebraica, cualquier corrección de este defecto se va a validar mirando el cielo, que es exactamente lo que ya pasó dos veces.
 
 ---
 
-*Revisión hecha sobre el código de la 0.2.4 en el commit `9effa94`. Las afirmaciones sobre mediciones previas están verificadas contra `docs/lineas-metodos-aplicados.md`; las de código, contra el árbol del repositorio; las de cronología, contra el historial de commits.*
+*Revisión hecha sobre el código de la 0.2.4. Las afirmaciones sobre mediciones previas están verificadas contra `docs/lineas-metodos-aplicados.md`; las de código, contra el árbol del repositorio; la cronología de las grabaciones, contra los metadatos de los archivos de video.*
