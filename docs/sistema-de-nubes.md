@@ -167,7 +167,30 @@ Además, cuando el LOD de una región cambia se encola la versión nueva **pero 
 
 Se dibuja después de los bloques translúcidos y antes del clima: ya quedan ordenadas respecto del terreno, y la lluvia y la nieve siguen por delante.
 
-### 3.11 Supresión de las nubes vanilla
+### 3.11 Dónde corre: solo cliente
+
+Atmosia es **un mod de cliente**. Dibuja nubes y no toca la lógica del mundo: no hay bloques, ni
+entidades, ni generación de terreno, ni paquetes de red. Nada de lo que hace necesita que el
+servidor se entere.
+
+En el código eso es verificable, no una intención: ninguna clase menciona `ServerLevel`,
+`ServerPlayer`, `MinecraftServer` ni `BlockEntity`, y los tres puntos de registro de eventos están
+detrás de `Dist.CLIENT`, que hace que las clases ni siquiera se carguen en un servidor dedicado.
+
+La consecuencia práctica es que funciona en **cualquier** servidor —vanilla, Paper, Spigot,
+modeado— porque el servidor no participa. Y que los demás jugadores no ven estas nubes: cada uno ve
+las suyas, o las vanilla si no tiene el mod.
+
+Eso a su vez explica la decisión de la seed de la Sección 7: un cliente conectado a un servidor
+remoto no conoce la seed del mundo, así que las nubes se derivan de la dirección del servidor. Dos
+jugadores del mismo servidor no ven necesariamente las mismas nubes, y esa limitación es
+consecuencia directa de ser un mod de cliente, no un descuido.
+
+`mods.toml` declara `displayTest="IGNORE_ALL_VERSION"`. Sin esa línea Forge asume `MATCH_VERSION` y
+exige que el servidor tenga el mod con la misma versión; el síntoma es una cruz roja de
+incompatible en la lista de servidores para todos los servidores que no lo tengan, que son todos.
+
+### 3.12 Supresión de las nubes vanilla
 
 Sin mixin. Atmosia **apaga el ajuste de nubes del propio juego** mientras dibuja, y lo restaura al desactivarse.
 

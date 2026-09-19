@@ -33,6 +33,12 @@ Lo que falta es un entorno con Minecraft: compilar, corregir lo que salte, y med
 | `docs/benchmark.md` | Cómo funciona el harness de medición, qué mide y qué no. |
 | `docs/fases.md` | Qué cubre cada fase del documento de diseño y en qué estado de verificación está. |
 
+## Cliente o servidor
+
+**Solo de cliente.** Se instala en la carpeta `mods` del jugador y funciona en cualquier servidor,
+incluidos los vanilla. El servidor no lo necesita, no hay que instalarlo ahí, y los demás jugadores
+no ven estas nubes.
+
 ## Qué hace falta para seguir
 
 1. **Compilar**: `./gradlew build`. La versión de Forge ya está puesta (47.4.10); si Gradle no la

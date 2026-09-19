@@ -6,10 +6,22 @@ license="${mod_license}"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
+# Atmosia es solo de cliente: dibuja nubes y no toca la lógica del mundo.
+#
+# Sin esta línea, Forge asume MATCH_VERSION y exige que el servidor tenga el mod instalado con la
+# misma versión. La consecuencia es que en la lista de servidores aparece una cruz roja de
+# incompatible en cualquier servidor que no lo tenga, que son todos: vanilla, Paper, Spigot y
+# cualquiera con otra lista de mods. IGNORE_ALL_VERSION le dice a Forge que este mod no participa
+# de esa comprobación, que es lo correcto para un mod que el servidor no necesita conocer.
+displayTest="IGNORE_ALL_VERSION"
+
 description='''
 Sistema de nubes procedurales que reemplaza por completo las nubes vanilla: campo de densidad
 por región, slices horizontales, LOD por distancia y capa, culling con fade y caché con
 presupuesto por frame. Incluye un harness de benchmark para medir contra vanilla.
+
+Solo de cliente. Se instala en la carpeta mods del jugador y funciona en cualquier servidor,
+incluidos los vanilla. El servidor no lo necesita y los demás jugadores no lo ven.
 '''
 
 [[dependencies.${mod_id}]]
