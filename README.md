@@ -27,6 +27,7 @@ Lo que falta es un entorno con Minecraft: compilar, corregir lo que salte, y med
 | `docs/sistema-de-nubes.md` | **Cómo funciona el sistema de nubes que está andando hoy**, del ruido al dibujo, con sus ventajas y sus costos medidos. |
 | `docs/metodo-de-renderizado.md` | **El método, paso a paso**: cómo se cargan, se generan y se dibujan las nubes, del ruido al draw call. Solo la técnica. |
 | `docs/lineas-metodos-aplicados.md` | Inventario de todo lo aplicado contra el artefacto de las lineas rectas: cambios, valores e instrumentacion. |
+| `docs/revision-analisis-lineas.md` | Revisión de un diagnóstico externo sobre las líneas: qué verifica, qué no se sostiene y en qué orden conviene atacarlo. |
 | `docs/artefactos-visuales.md` | Las bandas grises y la "recarga" de nubes: diagnóstico medido y corrección. |
 | `docs/propuesta-0.3.0-nubes-horneadas.md` | Propuesta de rediseño: reemplazar la geometría por celda por texturas horneadas. Con sus dos costos nuevos y sus criterios de abandono. |
 | `docs/fase-0-analisis-y-arquitectura.md` | La respuesta a lo que pide el documento: arquitectura propuesta, decisiones con sus alternativas, riesgos y verificaciones pendientes. |
