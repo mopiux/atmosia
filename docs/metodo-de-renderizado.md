@@ -1,6 +1,6 @@
 # El método: cómo se cargan y se dibujan las nubes
 
-*Descripción técnica del sistema tal como está en la versión 0.2.4. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
+*Descripción técnica del sistema tal como está en la versión 0.2.5. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
 
 ---
 
@@ -169,16 +169,16 @@ La clase y la distancia se empaquetan en un solo `long` (`clase << 32 | distanci
 `DensityJob` es deliberadamente puro: recibe seed, capa, región y nivel de detalle, y devuelve un arreglo de `float`. No toca Minecraft, no toca OpenGL y no comparte estado mutable, así que es seguro en cualquier hilo.
 
 ```java
-for (cz = 0; cz < celdas; cz++)
-  for (cx = 0; cx < celdas; cx++)
-    z = originZ + (cz + 0.5) * ladoDeCelda;   // centro de la celda
-    x = originX + (cx + 0.5) * ladoDeCelda;   // coordenadas LOCALES a la región
-    densidad[cz * celdas + cx] = campo.densityAt(x, z);
+for (cz = 0; cz <= celdas; cz++)
+  for (cx = 0; cx <= celdas; cx++)
+    z = originZ + cz * ladoDeCelda;           // ESQUINA de la celda
+    x = originX + cx * ladoDeCelda;           // coordenadas LOCALES a la región
+    densidad[cz * esquinas + cx] = campo.densityAt(x, z);
 ```
 
 Dos cosas que hacen falta subrayar:
 
-- Se muestrea en el **centro** de cada celda, no en la esquina.
+- Se muestrea en las **esquinas** de cada celda, no en su centro. Cada vértice lleva después su propio alfa y el color se interpola por la cara, así que la silueta de la nube es continua en vez de escalonada. Cuesta una fila y una columna más de muestras —289 en vez de 256 en el nivel más fino, un 13 %— y no cuesta nada en la GPU. De paso cierra el borde entre regiones sin trabajo extra: la esquina derecha de la última celda de una región cae exactamente sobre la esquina izquierda de la primera de su vecina.
 - Las coordenadas son **locales a la región**. Junto con el hash entero, es la otra mitad de la estrategia de origen flotante: el ruido nunca ve un número grande en punto flotante.
 
 El resultado lleva además la cuenta de celdas no vacías, que sirve para dos cosas: saltear por completo las regiones de cielo despejado, y estimar cuántos cuádruples va a costar construir la malla antes de construirla.
@@ -211,32 +211,37 @@ Para la capa baja (base 172, espesor 16) eso da:
 
 ```java
 desdeElCentro = |t − 0.5| * 2;
-umbral = 0.06 + 0.62 * desdeElCentro^1.6;
+umbral = 0.06 + 0.30 * desdeElCentro^1.35;
 ```
 
-Con ocho cortes: **0,561 · 0,352 · 0,189 · 0,082 · 0,082 · 0,189 · 0,352 · 0,561**.
+Con ocho cortes: **0,311 · 0,219 · 0,140 · 0,078 · 0,078 · 0,140 · 0,219 · 0,311**.
+
+El rango está elegido contra la distribución real del campo, no a ojo. Medido sobre 640.000 muestras de la capa baja: el 97 % de las celdas con nube quedan por debajo de 0,6 de densidad y la media es 0,19. Con estos umbrales, los ocho cortes cubren el 21 %, 38 %, 56 % y 72 % de las celdas con nube, y de ahí hacia abajo en espejo — un perfil repartido, en vez de unos pocos cortes haciendo todo el trabajo.
 
 El umbral depende de la **altura normalizada**, no del índice del corte. Es una condición para que la escalera sirva de algo: dos cortes que caen a la misma altura desde niveles de detalle distintos tienen que recortar la nube igual.
 
-**El borde suave.** Una celda que apenas supera el umbral no aparece de golpe: se desvanece a lo largo de un rango de 0,22 de densidad.
+**El borde suave.** Una celda que apenas supera el umbral no aparece de golpe: se desvanece a lo largo de un rango de 0,38 de densidad, con una curva suave.
 
 ```java
-alfaDeCelda = min(1, (densidad − umbral) / 0.22);
+u = (densidad − umbral) / 0.38;
+alfaDeCelda = u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 − 2 * u);
 ```
 
-Es lo que evita que el cielo se vea como una cuadrícula de bloques.
+Dos propiedades importan acá, y las dos apuntan a lo mismo:
 
-**La opacidad: constante, sea cual sea el nivel de detalle.** El alfa de cada corte se deriva de cuántos cortes hay, de modo que la pila completa siempre converja a la misma opacidad:
+- **El ancho, 0,38, es casi el triple del salto de umbral entre dos cortes vecinos** (0,09 con ocho cortes, 0,17 con cuatro). Así la silueta de un corte se superpone con la del siguiente en vez de terminar justo donde esa empieza. Sin superposición, la pila vista de canto se lee como una escalera de terrazas: un escalón por corte.
+- **La curva es hermite y no una rampa recta.** Una rampa recta es continua pero su derivada no: hay un quiebre donde la nube empieza y otro donde satura. Un quiebre en el alfa es lo que el ojo lee como una línea. Con `u²(3−2u)` la derivada se anula en los dos extremos.
+
+**La opacidad: constante, sea cual sea el nivel de detalle.** Cada corte lleva un peso según su altura —los de los extremos aportan poco menos de seis décimos de lo que aporta el central— y la escalera se normaliza para que la pila completa converja siempre a la misma opacidad:
 
 ```java
-alfaPorCorte = 1 − (1 − 0.92)^(1/cortes)
+peso  = 1 − 0.55 * desdeElCentro²
+alfa_i = s * peso_i,  con s tal que  producto(1 − alfa_i) = 1 − 0.92
 ```
 
-| Cortes | Alfa por corte | Opacidad de la pila |
-|---|---|---|
-| 8 | 0,271 | 0,92 |
-| 4 | 0,468 | 0,92 |
-| 2 | 0,717 | 0,92 |
+El factor común se resuelve por bisección, una vez por malla construida. Con ocho cortes eso da alfas de 0,190 en los extremos y 0,325 en el centro; con cuatro, 0,326 y 0,519.
+
+El peso es lo que hace que la capa **se desvanezca hacia arriba y hacia abajo** en vez de terminar en un canto duro. Un canto duro, visto de canto, es justamente lo que se lee como una lámina.
 
 La pila no llega a 1 a propósito: una nube que tapa el cielo por completo deja de leerse como volumen. Y como la opacidad total no cambia entre niveles, **el nivel de detalle cambia la estructura interna de la nube y no su densidad aparente**, que es lo que debe hacer un LOD.
 
@@ -459,9 +464,10 @@ Los cálculos que ya estaban en vuelo cuando se cambió la cantidad de nubes se 
 | Peldaños de la escalera de alturas | 8 | `DensityField` |
 | Opacidad de la pila de cortes | 0,92 | `DensityField` |
 | Cobertura máxima | 0,95 | `DensityField` |
-| Suavidad del borde | 0,22 de densidad | `DensityField` |
+| Suavidad del borde | 0,38 de densidad, curva hermite | `DensityField` |
 | Sombreado de la base | 0,78 (techo: 1,0) | `DensityField` |
-| Umbral de densidad | 0,06 + 0,62 · desdeElCentro^1,6 | `DensityField` |
+| Umbral de densidad | 0,06 + 0,30 · desdeElCentro^1,35 | `DensityField` |
+| Peso vertical del corte | 1 − 0,55 · desdeElCentro² | `DensityField` |
 | Dispersión hacia adelante | hasta ×1,35, exponente 6 | `DensityField` |
 | Tramos de LOD | 20 % · 53 % · 100 % | `LodSelector` |
 | Piso del domo | 512 bloques | `LodSelector` |

@@ -41,9 +41,170 @@ public final class CoreSmokeTest {
         stackOpacity();
         prefetch();
         seams();
+        terrazas();
 
         System.out.println(fails == 0 ? "\nTODO OK" : "\n" + fails + " FALLAS");
         System.exit(fails == 0 ? 0 : 1);
+    }
+
+    /**
+     * Que la pila no se lea como una escalera de terrazas vista de canto.
+     *
+     * Es el defecto que quedaba tras cerrar la costura de LOD: cada corte terminaba su silueta
+     * justo donde empezaba la del siguiente, sin solapamiento, y desde abajo en angulo rasante se
+     * veia un escalon por corte. La invariante que lo evita es que la transicion de borde sea
+     * bastante mas ancha que el salto de umbral entre cortes vecinos.
+     */
+    static void terrazas() {
+        NoiseField n = new NoiseField(11L);
+        double borde = DensityField.edgeSoftness();
+
+        for (CloudLayerDef capa : CloudLayerDef.DEFAULTS) {
+            DensityField f = new DensityField(n, capa);
+            for (LodLevel nivel : LodLevel.values()) {
+                int cortes = nivel.slices();
+                if (cortes < 2) {
+                    continue;
+                }
+                double salto = f.maxThresholdGap(cortes);
+                check("  " + capa.name() + "/" + nivel + ": las siluetas vecinas se solapan",
+                        borde > salto * 2.0D,
+                        String.format(Locale.ROOT, "borde %.3f vs salto %.3f", borde, salto));
+            }
+        }
+
+        DensityField f = new DensityField(n, CloudLayerDef.LOW);
+
+        // El perfil vertical tiene que seguir existiendo: si todos los umbrales fueran iguales la
+        // capa seria una losa y los cortes no aportarian ninguna forma.
+        double centro = f.sliceThreshold(4, 8);
+        double extremo = f.sliceThreshold(0, 8);
+        check("el perfil vertical sobrevive al aplanado",
+                extremo > centro * 3.0D,
+                String.format(Locale.ROOT, "extremo %.3f vs centro %.3f", extremo, centro));
+
+        // Y el umbral tiene que seguir siendo funcion de la altura, no del indice: es lo que
+        // mantiene cerradas las costuras entre niveles de detalle.
+        check("el umbral sigue dependiendo solo de la altura",
+                Math.abs(f.thresholdAt(DensityField.sliceT(1, 4)) - f.sliceThreshold(1, 4)) < 1.0E-9D,
+                "");
+
+        // Una celda cuyas cuatro esquinas estan en cero no aporta geometria; una con una sola
+        // esquina con densidad si, y por eso la silueta deja de ser escalonada.
+        check("el borde reparte alfa parcial",
+                f.cellAlpha(centro + borde * 0.5D, centro) > 0.4F
+                        && f.cellAlpha(centro + borde * 0.5D, centro) < 0.6F,
+                f.cellAlpha(centro + borde * 0.5D, centro));
+        check("el borde satura recien al final del rango",
+                f.cellAlpha(centro + borde * 0.99D, centro) < 1.0F
+                        && f.cellAlpha(centro + borde * 1.01D, centro) == 1.0F, "");
+
+        // La prueba de verdad: un rayo rasante que atraviesa la pila no debe encontrar ningun
+        // escalon visible. Reproduce lo que se midio en las capturas -grupos de escalones de 2 a
+        // 11 niveles de gris, separados unos pocos pixeles- y comprueba que ya no aparezcan.
+        // Se mide la CURVATURA y no el salto a secas: un degradado suave tambien cambia de un
+        // pixel al siguiente, y lo que delata un escalon es que ese cambio se quiebre. Es el mismo
+        // criterio con el que se midieron las capturas.
+        int muestras = 300;
+        double peorActual = 0.0D;
+        double peorViejo = 0.0D;
+        double sumaActual = 0.0D;
+        double sumaVieja = 0.0D;
+        for (double az = 0.0D; az < 6.2D; az += 0.31D) {
+            double[] actual = new double[muestras];
+            double[] antes = new double[muestras];
+            for (int i = 0; i < muestras; i++) {
+                double elevacion = 4.0D + 18.0D * i / (muestras - 1.0D);
+                actual[i] = columnaRasante(f, n, CloudLayerDef.LOW, elevacion, az, false);
+                antes[i] = columnaRasante(f, n, CloudLayerDef.LOW, elevacion, az, true);
+            }
+            for (int i = 1; i + 1 < muestras; i++) {
+                double ca = Math.abs(actual[i + 1] - 2 * actual[i] + actual[i - 1]) * 255.0D;
+                double cv = Math.abs(antes[i + 1] - 2 * antes[i] + antes[i - 1]) * 255.0D;
+                peorActual = Math.max(peorActual, ca);
+                peorViejo = Math.max(peorViejo, cv);
+                sumaActual += ca;
+                sumaVieja += cv;
+            }
+        }
+        // El criterio es absoluto y no un multiplo: un framebuffer de ocho bits por canal no puede
+        // representar una diferencia menor a un nivel de gris, asi que un quiebre por debajo de uno
+        // no se puede dibujar aunque el calculo lo produzca.
+        check("ningun quiebre de la columna llega a un nivel de gris",
+                peorActual < 1.0D,
+                String.format(Locale.ROOT, "%.2f niveles, contra %.2f de la 0.2.4",
+                        peorActual, peorViejo));
+        check("y ademas queda muy por debajo del de la 0.2.4",
+                peorActual * 2.5D < peorViejo,
+                String.format(Locale.ROOT, "%.2f contra %.2f", peorActual, peorViejo));
+        check("la energia de escalones de la columna baja al menos cinco veces",
+                sumaActual * 5.0D < sumaVieja,
+                String.format(Locale.ROOT, "%.1f contra %.1f", sumaActual, sumaVieja));
+    }
+
+    /**
+     * Brillo compuesto de un rayo que sale del ojo con una elevacion y un azimut dados y atraviesa
+     * los ocho cortes de una capa.
+     *
+     * Modela lo que hace la GPU: la densidad se toma en las cuatro esquinas de la celda y el alfa
+     * se interpola por la cara. Es la diferencia con la 0.2.4, donde la densidad era el centro de
+     * la celda y el alfa quedaba plano en todo el cuadrilatero -y cada vez que el punto de cruce
+     * pasaba de una celda a la vecina, el alfa saltaba de golpe.
+     */
+    static double columnaRasante(DensityField f, NoiseField n, CloudLayerDef capa,
+                                 double elevacionGrados, double azimut, boolean comoLa024) {
+        final double ojo = 100.0D;
+        final double celda = 16.0D;
+        int cortes = 8;
+        float[] alfas = DensityField.sliceAlphas(cortes);
+        double alfaPlano = 1.0D - Math.pow(1.0D - DensityField.stackOpacity(), 1.0D / cortes);
+        double color = 0.72D;
+
+        for (int i = cortes - 1; i >= 0; i--) {   // de lejos a cerca: el corte mas alto primero
+            double t = DensityField.sliceT(i, cortes);
+            double altura = capa.baseHeight() + t * capa.thickness();
+            double radio = (altura - ojo) / Math.tan(Math.toRadians(elevacionGrados));
+            double x = radio * Math.cos(azimut);
+            double z = radio * Math.sin(azimut);
+
+            double alfa;
+            double propio;
+            if (comoLa024) {
+                // Densidad del centro de la celda, plana en todo el cuadrilatero, y la curva de
+                // umbral y el borde de la 0.2.4. Cada vez que el punto de cruce pasaba a la celda
+                // vecina, el alfa saltaba de golpe: eso es el escalon.
+                double cx = (Math.floor(x / celda) + 0.5D) * celda;
+                double cz = (Math.floor(z / celda) + 0.5D) * celda;
+                double d = f.densityAt(cx, cz);
+                double desdeCentro = Math.abs(t - 0.5D) * 2.0D;
+                double umbral = 0.06D + 0.62D * Math.pow(desdeCentro, 1.6D);
+                alfa = d <= umbral ? 0.0D : Math.min(1.0D, (d - umbral) / 0.22D);
+                propio = capa.green() * (0.78D + 0.22D * t) * (1.0D - 0.12D * d);
+                alfa *= alfaPlano;
+            } else {
+                // Densidad en las cuatro esquinas, alfa y sombra interpolados por la cara: es lo
+                // que hace la GPU con un color por vertice.
+                double umbral = f.sliceThreshold(i, cortes);
+                double x0 = Math.floor(x / celda) * celda;
+                double z0 = Math.floor(z / celda) * celda;
+                double fx = (x - x0) / celda;
+                double fz = (z - z0) / celda;
+                double suma = 0.0D;
+                propio = 0.0D;
+                for (int esquina = 0; esquina < 4; esquina++) {
+                    double ex = x0 + (esquina % 2) * celda;
+                    double ez = z0 + (esquina / 2) * celda;
+                    double peso = ((esquina % 2) == 0 ? 1.0D - fx : fx)
+                            * ((esquina / 2) == 0 ? 1.0D - fz : fz);
+                    double d = f.densityAt(ex, ez);
+                    suma += peso * f.cellAlpha(d, umbral);
+                    propio += peso * capa.green() * f.shade(d, i, cortes);
+                }
+                alfa = suma * alfas[i];
+            }
+            color = propio * alfa + color * (1.0D - alfa);
+        }
+        return color;
     }
 
     /** Perfiles graficos: que los tres se ordenen y que el tope de detalle mande. */
@@ -177,10 +338,10 @@ public final class CoreSmokeTest {
 
         double peor = 0.0D;
         for (LodLevel level : LodLevel.values()) {
-            float alfa = DensityField.sliceAlpha(level.slices());
+            float[] alfas = DensityField.sliceAlphas(level.slices());
             double resto = 1.0D;
             for (int i = 0; i < level.slices(); i++) {
-                resto *= (1.0D - alfa);
+                resto *= (1.0D - alfas[i]);
             }
             double acumulada = 1.0D - resto;
             peor = Math.max(peor, Math.abs(acumulada - objetivo));
@@ -190,12 +351,54 @@ public final class CoreSmokeTest {
         // Es el defecto que se veia volando: cada cambio de nivel cambiaba el brillo de la nube.
         check("ningun cambio de nivel altera la opacidad", peor < 1.0E-6D, peor);
 
+        // Se compara el corte central de cada nivel: es el que no arrastra el peso del extremo.
         check("mas cortes, menos alfa cada uno",
-                DensityField.sliceAlpha(8) < DensityField.sliceAlpha(4)
-                        && DensityField.sliceAlpha(4) < DensityField.sliceAlpha(2), "");
+                DensityField.sliceAlpha(4, 8) < DensityField.sliceAlpha(2, 4)
+                        && DensityField.sliceAlpha(2, 4) < DensityField.sliceAlpha(1, 2), "");
         check("un solo corte aporta toda la opacidad",
-                Math.abs(DensityField.sliceAlpha(1) - objetivo) < 1.0E-6D, DensityField.sliceAlpha(1));
-        check("cero cortes no rompe", DensityField.sliceAlpha(0) > 0.0F, DensityField.sliceAlpha(0));
+                Math.abs(DensityField.sliceAlpha(0, 1) - objetivo) < 1.0E-6D,
+                DensityField.sliceAlpha(0, 1));
+        check("cero cortes no rompe", DensityField.sliceAlpha(0, 0) > 0.0F,
+                DensityField.sliceAlpha(0, 0));
+
+        // La pila se desvanece hacia los extremos en vez de terminar en un canto duro. Ese canto
+        // es lo que hacia que la capa, vista de canto, se leyera como un juego de laminas.
+        for (LodLevel level : LodLevel.values()) {
+            int n = level.slices();
+            if (n < 4) {
+                continue;
+            }
+            float[] alfas = DensityField.sliceAlphas(n);
+            // La escalera de cuatro cortes es asimetrica -sus peldanos son {1,3,5,7} de ocho- asi
+            // que el corte mas extremo no es el de indice cero. Se busca por altura, no por indice.
+            int masExtremo = 0;
+            int masCentral = 0;
+            for (int i = 1; i < n; i++) {
+                double d = Math.abs(DensityField.sliceT(i, n) - 0.5D);
+                if (d > Math.abs(DensityField.sliceT(masExtremo, n) - 0.5D)) {
+                    masExtremo = i;
+                }
+                if (d < Math.abs(DensityField.sliceT(masCentral, n) - 0.5D)) {
+                    masCentral = i;
+                }
+            }
+            check("  " + level + ": el corte mas extremo pesa menos que el mas central",
+                    alfas[masExtremo] < alfas[masCentral] * 0.75F,
+                    alfas[masExtremo] + " vs " + alfas[masCentral]);
+
+            // Y el orden tiene que ser monotono: cuanto mas lejos del centro, menos aporta.
+            boolean monotono = true;
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    double di = Math.abs(DensityField.sliceT(i, n) - 0.5D);
+                    double dj = Math.abs(DensityField.sliceT(j, n) - 0.5D);
+                    if (di < dj - 1.0E-9D && alfas[i] <= alfas[j]) {
+                        monotono = false;
+                    }
+                }
+            }
+            check("  " + level + ": el peso baja de forma monotona hacia los extremos", monotono, "");
+        }
 
         // El compuesto visto desde abajo nunca debe caer por debajo del cielo: eso era la banda gris.
         NoiseField ruido = new NoiseField(7L);
@@ -203,11 +406,12 @@ public final class CoreSmokeTest {
         double[] cielo = { 0.620D, 0.710D, 0.850D };
         float[] color = { CloudLayerDef.LOW.red(), CloudLayerDef.LOW.green(), CloudLayerDef.LOW.blue() };
         int cortes = LodLevel.HIGH.slices();
-        float alfa = DensityField.sliceAlpha(cortes);
+        float[] alfas = DensityField.sliceAlphas(cortes);
         double[] c = { cielo[0], cielo[1], cielo[2] };
         double masOscuro = 1.0D;
         for (int i = 0; i < cortes; i++) {
             float sombra = campo.shade(1.0D, i, cortes);
+            float alfa = alfas[i];
             for (int k = 0; k < 3; k++) {
                 c[k] = color[k] * sombra * alfa + c[k] * (1.0D - alfa);
             }

@@ -13,8 +13,18 @@ package dev.mopiux.atmosia.core;
  */
 public final class DensityField {
 
-    /** Ancho de la transicion entre "no hay nube" y "nube opaca". Mas bajo, bordes mas duros. */
-    private static final double EDGE_SOFTNESS = 0.22D;
+    /**
+     * Ancho de la transicion entre "no hay nube" y "nube opaca", medido en densidad.
+     *
+     * Estuvo en 0,22 hasta la 0.2.4, y ese valor era del mismo orden que el salto de umbral entre
+     * dos cortes vecinos (0,21 en el peor caso). La consecuencia es que la silueta de cada corte
+     * terminaba justo donde empezaba la del siguiente, sin solaparse: vista de canto, la pila se
+     * leia como una escalera de terrazas, un escalon por corte.
+     *
+     * 0,38 hace que la silueta de un corte se extienda sobre casi tres saltos de umbral, asi que
+     * las siluetas vecinas se superponen y el conjunto pasa de escalones a degradado.
+     */
+    private static final double EDGE_SOFTNESS = 0.38D;
 
     /**
      * Cuanto oscurece la base de la capa respecto del techo.
@@ -135,7 +145,43 @@ public final class DensityField {
      */
     public double thresholdAt(double t) {
         double fromCenter = Math.abs(t - 0.5D) * 2.0D;
-        return 0.06D + 0.62D * Math.pow(fromCenter, 1.6D);
+        return 0.06D + THRESHOLD_RANGE * Math.pow(fromCenter, THRESHOLD_EXPONENT);
+    }
+
+    /**
+     * Cuanto mas exigente es el corte mas extremo respecto del central.
+     *
+     * Estuvo en 0,62 con exponente 1,6, y ese rango era demasiado ancho para las densidades que el
+     * campo produce de verdad. Medido sobre 640.000 muestras de la capa baja: el 97% de las celdas
+     * con nube quedan por debajo de 0,6 y la densidad media es 0,19. Con el umbral extremo en
+     * 0,561, los cortes de arriba y de abajo alcanzaban al 1,5% de las celdas -practicamente no se
+     * dibujaban- y del 1,5% se saltaba al 15% del corte siguiente. Ese salto es el escalon.
+     *
+     * 0,30 con exponente 1,35 reparte los ocho cortes sobre el rango donde el campo realmente
+     * vive: cubren el 21%, 38%, 56% y 72% de las celdas con nube, y de ahi hacia abajo en espejo.
+     * El perfil vertical se conserva -el corte extremo sigue exigiendo cuatro veces la densidad
+     * del central- y el salto maximo entre cortes vecinos baja de 0,21 a 0,09 con ocho cortes y a
+     * 0,17 con cuatro, en los dos casos bien por debajo del ancho de la transicion de borde.
+     */
+    private static final double THRESHOLD_RANGE = 0.30D;
+    private static final double THRESHOLD_EXPONENT = 1.35D;
+
+    /** El salto de umbral mas grande entre dos cortes vecinos. Para tests y diagnostico. */
+    public double maxThresholdGap(int slices) {
+        if (slices <= 1) {
+            return 0.0D;
+        }
+        double peor = 0.0D;
+        for (int i = 0; i + 1 < slices; i++) {
+            peor = Math.max(peor, Math.abs(this.sliceThreshold(i + 1, slices)
+                    - this.sliceThreshold(i, slices)));
+        }
+        return peor;
+    }
+
+    /** El ancho de la transicion de borde. Para tests. */
+    public static double edgeSoftness() {
+        return EDGE_SOFTNESS;
     }
 
     /** Umbral del slice {@code index} de {@code slices}. */
@@ -153,25 +199,80 @@ public final class DensityField {
     }
 
     /**
-     * Opacidad que le toca a cada corte para que la pila entera llegue siempre a la misma.
+     * Cuanto pesa cada corte dentro de la pila, segun su altura normalizada.
      *
-     * Hasta la 0.2.1 el alfa por corte era una constante -0,55 apilado, 0,85 solo- y la opacidad de
-     * la pila salia de cuantos cortes hubiera. Eso tenia dos consecuencias, las dos visibles:
+     * Hasta la 0.2.4 todos los cortes tenian el mismo alfa, asi que la pila empezaba y terminaba
+     * de golpe: el corte mas bajo aportaba tanto como el central y el borde inferior de la capa
+     * era un canto duro. Vista de canto, esa pila se lee como un juego de laminas apiladas.
      *
-     * <ul>
-     *   <li>Con ocho cortes la pila llegaba a 0,998. El nucleo de una formacion era una pared
-     *       opaca, que es lo contrario de lo que el sistema de cortes existe para producir.</li>
-     *   <li>Cada cambio de nivel de detalle cambiaba la opacidad: 0,998 con ocho cortes, 0,959 con
-     *       cuatro, 0,798 con dos. Veinte puntos de brillo de golpe al cruzar un umbral de
-     *       distancia, que es buena parte del "popping" que se ve volando.</li>
-     * </ul>
-     *
-     * Con esta formula el nivel de detalle cambia la estructura interna de la nube y no su
-     * densidad aparente, que es lo que debe hacer un LOD.
+     * Con el peso, los cortes de los extremos aportan poco menos de seis decimos de lo que aporta
+     * el central, y la capa se desvanece hacia arriba y hacia abajo en vez de cortarse.
      */
-    public static float sliceAlpha(int slices) {
+    private static final double EDGE_TAPER = 0.55D;
+
+    private static double sliceWeight(int index, int slices) {
+        if (slices <= 1) {
+            return 1.0D;
+        }
+        double fromCenter = Math.abs(sliceT(index, slices) - 0.5D) * 2.0D;
+        return 1.0D - EDGE_TAPER * fromCenter * fromCenter;
+    }
+
+    /**
+     * Alfa de cada corte de la pila, con el peso vertical ya aplicado y normalizado.
+     *
+     * La normalizacion es la que mantiene la invariante de la 0.2.2: sea cual sea la cantidad de
+     * cortes y sea cual sea el reparto de pesos, la pila completa converge siempre a
+     * {@link #stackOpacity()}. Asi el nivel de detalle cambia la estructura interna de la nube y
+     * no su densidad aparente.
+     *
+     * Se resuelve por biseccion sobre el factor comun: hay que encontrar el {@code s} tal que
+     * {@code producto(1 - s * peso_i) = 1 - opacidad}. La suma de logaritmos es monotona
+     * decreciente en {@code s}, asi que la biseccion converge sin sorpresas. Se llama una vez por
+     * malla construida, no por cuadrilatero.
+     */
+    public static float[] sliceAlphas(int slices) {
         int n = Math.max(1, slices);
-        return (float) (1.0D - Math.pow(1.0D - STACK_OPACITY, 1.0D / n));
+        float[] out = new float[n];
+        if (n == 1) {
+            out[0] = (float) STACK_OPACITY;
+            return out;
+        }
+
+        double[] peso = new double[n];
+        double mayor = 0.0D;
+        for (int i = 0; i < n; i++) {
+            peso[i] = sliceWeight(i, n);
+            mayor = Math.max(mayor, peso[i]);
+        }
+
+        double objetivo = Math.log(1.0D - STACK_OPACITY);
+        double bajo = 0.0D;
+        double alto = 1.0D / mayor;
+        for (int paso = 0; paso < 64; paso++) {
+            double s = 0.5D * (bajo + alto);
+            double suma = 0.0D;
+            for (int i = 0; i < n; i++) {
+                suma += Math.log(1.0D - s * peso[i]);
+            }
+            if (suma > objetivo) {
+                bajo = s;
+            } else {
+                alto = s;
+            }
+        }
+
+        double s = 0.5D * (bajo + alto);
+        for (int i = 0; i < n; i++) {
+            out[i] = (float) (s * peso[i]);
+        }
+        return out;
+    }
+
+    /** El alfa de un corte suelto. Comodidad para tests: construye la escalera entera. */
+    public static float sliceAlpha(int index, int slices) {
+        float[] todos = sliceAlphas(slices);
+        return todos[Math.max(0, Math.min(todos.length - 1, index))];
     }
 
     /** La opacidad a la que converge una pila completa. Para tests y diagnostico. */
@@ -190,7 +291,14 @@ public final class DensityField {
             return 0.0F;
         }
         double over = (density - threshold) / EDGE_SOFTNESS;
-        return (float) Math.min(1.0D, over);
+        if (over >= 1.0D) {
+            return 1.0F;
+        }
+        // Suavizado hermite en vez de rampa recta. Una rampa recta es continua pero su derivada no:
+        // hay un quiebre donde la nube empieza y otro donde satura, y un quiebre en el alfa es
+        // exactamente lo que el ojo lee como una linea cuando se mira la capa de canto. Con
+        // t^2(3-2t) la derivada se anula en los dos extremos y la silueta entra y sale sin canto.
+        return (float) (over * over * (3.0D - 2.0D * over));
     }
 
     /**

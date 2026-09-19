@@ -52,29 +52,52 @@ public final class DensityJob {
     }
 
     /**
-     * Calcula la densidad celda por celda.
+     * Calcula la densidad en las ESQUINAS de las celdas.
      *
-     * Se muestrea en el centro de cada celda y en coordenadas locales a la region, nunca absolutas:
-     * es la estrategia de floating origin de la Seccion 4, y es lo que mantiene el ruido estable a
-     * millones de bloques del origen.
+     * Hasta la 0.2.4 se muestreaba el centro de cada celda y ese unico valor pintaba el
+     * cuadrilatero entero con un alfa plano. Eso convierte cada celda en un rectangulo de borde
+     * duro, y con ello la grilla queda a la vista en cuanto dos celdas vecinas difieren.
+     *
+     * Muestreando las esquinas, cada vertice lleva su propio alfa y el color se interpola por la
+     * cara: la silueta de la nube pasa a ser continua en vez de escalonada. Cuesta una fila y una
+     * columna mas de muestras por region -289 en vez de 256 en el nivel mas fino, un 13%- y no
+     * cuesta nada en la GPU.
+     *
+     * Ademas cierra el borde entre regiones sin trabajo extra: la esquina derecha de la ultima
+     * celda de una region cae exactamente sobre la esquina izquierda de la primera de su vecina,
+     * misma coordenada de mundo y por lo tanto mismo valor de ruido.
+     *
+     * Las coordenadas siguen siendo locales a la region y nunca absolutas: es la estrategia de
+     * floating origin de la Seccion 4, y es lo que mantiene el ruido estable a millones de bloques
+     * del origen.
      */
     public Result compute() {
         int cells = this.lod.cellsPerSide(RegionKey.REGION_SIZE);
-        float[] density = new float[cells * cells];
+        int corners = cells + 1;
+        float[] density = new float[corners * corners];
         DensityField field = new DensityField(this.noise, this.layer, this.coverageScale);
 
         double originX = this.key.originX();
         double originZ = this.key.originZ();
         double cellSize = this.lod.cellSize();
 
+        for (int cz = 0; cz < corners; cz++) {
+            double z = originZ + cz * cellSize;
+            for (int cx = 0; cx < corners; cx++) {
+                double x = originX + cx * cellSize;
+                density[cz * corners + cx] = (float) field.densityAt(x, z);
+            }
+        }
+
+        // Una celda cuenta si alguna de sus cuatro esquinas tiene densidad: si las cuatro estan en
+        // cero, no hay nube en ningun punto de su interior y no se emite nada.
         int nonEmpty = 0;
         for (int cz = 0; cz < cells; cz++) {
-            double z = originZ + (cz + 0.5D) * cellSize;
             for (int cx = 0; cx < cells; cx++) {
-                double x = originX + (cx + 0.5D) * cellSize;
-                float value = (float) field.densityAt(x, z);
-                density[cz * cells + cx] = value;
-                if (value > 0.0F) {
+                if (density[cz * corners + cx] > 0.0F
+                        || density[cz * corners + cx + 1] > 0.0F
+                        || density[(cz + 1) * corners + cx] > 0.0F
+                        || density[(cz + 1) * corners + cx + 1] > 0.0F) {
                     nonEmpty++;
                 }
             }
@@ -82,8 +105,18 @@ public final class DensityJob {
         return new Result(this, density, cells, nonEmpty);
     }
 
-    /** Resultado listo para que el hilo de render arme la malla. */
+    /**
+     * Resultado listo para que el hilo de render arme la malla.
+     *
+     * @param density      densidades en las esquinas, de lado {@code cellsPerSide + 1}
+     * @param cellsPerSide celdas por lado de la region, no esquinas
+     */
     public record Result(DensityJob job, float[] density, int cellsPerSide, int nonEmptyCells) {
+
+        /** Esquinas por lado: una mas que celdas. */
+        public int cornersPerSide() {
+            return this.cellsPerSide + 1;
+        }
 
         public boolean isEmpty() {
             return this.nonEmptyCells == 0;
