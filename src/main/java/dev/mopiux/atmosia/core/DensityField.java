@@ -184,13 +184,39 @@ public final class DensityField {
         return EDGE_SOFTNESS;
     }
 
-    /** Umbral del slice {@code index} de {@code slices}. */
+    /**
+     * Umbral del corte {@code index} de {@code slices}.
+     *
+     * <h2>Por que un nivel grueso no usa el umbral de su altura</h2>
+     *
+     * La silueta de una capa -donde hay nube y donde no- la marca el corte de umbral mas bajo. Si
+     * un nivel de detalle tiene su minimo mas alto que otro, hay todo un rango de densidad en el
+     * que uno dibuja una nube tenue y el otro no dibuja nada. Entre dos regiones vecinas eso es un
+     * borde de silueta, y ningun ajuste de opacidad ni de color lo puede tapar: hay geometria de un
+     * lado y del otro no.
+     *
+     * Con dos cortes el minimo quedaba en 0,140 contra 0,078 del nivel de ocho: una franja entera
+     * de densidades donde el nivel lejano recortaba la nube antes que el cercano.
+     *
+     * La solucion es que cada corte grueso tome el umbral MAS BAJO del tramo de la escalera fina
+     * que reemplaza. Asi el minimo es el mismo en los tres niveles, la silueta exterior coincide
+     * exactamente, y lo unico que queda distinto -cuanto tapa y de que color- si se puede igualar.
+     */
     public double sliceThreshold(int index, int slices) {
         if (slices <= 1) {
-            // Con un solo slice no hay perfil que construir: se dibuja el cuerpo de la nube.
+            // Con un solo corte no hay perfil que construir: se dibuja el cuerpo de la nube.
             return 0.18D;
         }
-        return this.thresholdAt(sliceT(index, slices));
+        if (slices >= LADDER_STEPS) {
+            return this.thresholdAt(sliceT(index, slices));
+        }
+        int step = Math.max(1, LADDER_STEPS / slices);
+        double minimo = 1.0D;
+        for (int k = 0; k < step; k++) {
+            int fino = Math.min(LADDER_STEPS - 1, index * step + k);
+            minimo = Math.min(minimo, this.thresholdAt(sliceT(fino, LADDER_STEPS)));
+        }
+        return minimo;
     }
 
     /** Altura del slice, en bloques. */
@@ -269,31 +295,70 @@ public final class DensityField {
         return out;
     }
 
-    /** Resolucion de la tabla de correccion de sombreado. */
-    private static final int SHADE_BUCKETS = 65;
+    /** Resolucion de las tablas de igualacion entre niveles. */
+    private static final int MATCH_BUCKETS = 129;
 
-    /** Limites de la correccion, por si algun nivel no tiene nada dibujado a esa densidad. */
-    private static final double SHADE_SCALE_MIN = 0.96D;
-    private static final double SHADE_SCALE_MAX = 1.05D;
+    /** Tope del ajuste de alfa, para no empujar un corte hasta la opacidad total. */
+    private static final double MAX_SLICE_ALPHA = 0.995D;
 
     /**
-     * Cuanto pueden diferir las opacidades de dos niveles antes de dejar de corregir el color.
+     * Igualacion entre niveles de detalle: [orden][cortes][densidad].
      *
-     * La correccion de color solo tiene sentido cuando la unica diferencia ES el color. Si dos
-     * niveles tampoco coinciden en cuanto tapan -lo que pasa a densidades bajas, donde un nivel
-     * todavia no tiene ningun corte activo y el otro si- subirle el brillo al que tapa menos lo
-     * aleja en vez de acercarlo. Ahi la correccion se apaga sola.
+     * <h2>Que problema resuelve</h2>
+     *
+     * Dos regiones vecinas pueden tener distinto nivel de detalle, y el limite entre ellas es una
+     * recta de 256 bloques. Cualquier diferencia de aspecto entre los dos lados se ve como una
+     * linea, por chica que sea: medida en las capturas, una diferencia de apenas uno o dos niveles
+     * de gris ya se lee como una grilla en el cielo, porque el ojo detecta rectas largas de bajo
+     * contraste mucho mejor que manchas del mismo contraste.
+     *
+     * Asi que no alcanza con reducir la diferencia. Tiene que ser exactamente cero.
+     *
+     * <h2>Como</h2>
+     *
+     * Una columna de nube se ve por dos cosas: cuanto tapa y de que color queda. Hacen falta dos
+     * ajustes, uno por cada cosa, y en ese orden:
+     *
+     * <ol>
+     *   <li>{@code ALPHA_SCALE} multiplica los alfas de la pila hasta que tape exactamente lo mismo
+     *       que la pila del nivel mas detallado. Se resuelve por biseccion.</li>
+     *   <li>{@code SHADE_SCALE} multiplica el sombreado hasta que, con esos alfas ya corregidos, el
+     *       color compuesto tambien coincida.</li>
+     * </ol>
+     *
+     * Las dos dependen de la densidad, porque el desajuste depende de la densidad: a densidades
+     * bajas un nivel tiene cortes activos que el otro todavia no. Y las dos dependen del orden de
+     * mezcla, porque mezclar los mismos cortes al reves da otro color.
+     *
+     * Con el lado de celda ya unificado entre niveles, estas dos tablas son lo unico que faltaba:
+     * a partir de aca el nivel de detalle no cambia nada de lo que se ve.
      */
-    private static final double OPACITY_TOLERANCE = 0.020D;
+    private static final float[][][] ALPHA_SCALE = new float[2][LADDER_STEPS + 1][];
+    private static final float[][][] SHADE_SCALE = new float[2][LADDER_STEPS + 1][];
 
-    private static final float[][] SHADE_SCALE = buildShadeScale();
+    static {
+        buildLevelMatch();
+    }
 
     /** Umbral de un corte, sin instancia: no depende de la capa ni de la cobertura. */
     private static double thresholdOf(int index, int slices) {
         if (slices <= 1) {
             return 0.18D;
         }
-        double fromCenter = Math.abs(sliceT(index, slices) - 0.5D) * 2.0D;
+        if (slices >= LADDER_STEPS) {
+            return curve(sliceT(index, slices));
+        }
+        int step = Math.max(1, LADDER_STEPS / slices);
+        double minimo = 1.0D;
+        for (int k = 0; k < step; k++) {
+            int fino = Math.min(LADDER_STEPS - 1, index * step + k);
+            minimo = Math.min(minimo, curve(sliceT(fino, LADDER_STEPS)));
+        }
+        return minimo;
+    }
+
+    private static double curve(double t) {
+        double fromCenter = Math.abs(t - 0.5D) * 2.0D;
         return 0.06D + THRESHOLD_RANGE * Math.pow(fromCenter, THRESHOLD_EXPONENT);
     }
 
@@ -309,104 +374,115 @@ public final class DensityField {
         return over * over * (3.0D - 2.0D * over);
     }
 
-    /**
-     * Cuanto aporta al color la pila entera de {@code slices} cortes a una densidad dada.
-     *
-     * Se compone en el mismo orden en que el constructor de mallas emite los cortes -de abajo
-     * hacia arriba- porque ese es el orden en que la GPU los mezcla.
-     */
-    /** Opacidad que alcanza la pila de {@code slices} cortes a una densidad dada. */
-    private static double stackOpacityAt(int slices, double density) {
+    private static double verticalOf(int index, int slices) {
+        return slices <= 1
+                ? 0.88D
+                : BOTTOM_SHADE + (1.0D - BOTTOM_SHADE) * sliceT(index, slices);
+    }
+
+    /** Alfas efectivos de la pila a una densidad, sin ningun ajuste. */
+    private static double[] baseAlphas(int slices, double density) {
         int n = Math.max(1, slices);
-        float[] a = sliceAlphas(n);
-        double resto = 1.0D;
+        float[] ladder = sliceAlphas(n);
+        double[] out = new double[n];
         for (int i = 0; i < n; i++) {
-            resto *= 1.0D - a[i] * edgeAlphaOf(density, thresholdOf(i, n));
+            out[i] = ladder[i] * edgeAlphaOf(density, thresholdOf(i, n));
+        }
+        return out;
+    }
+
+    private static double opacityOf(double[] alphas, double scale) {
+        double resto = 1.0D;
+        for (double a : alphas) {
+            resto *= 1.0D - Math.min(MAX_SLICE_ALPHA, a * scale);
         }
         return 1.0D - resto;
     }
 
-    private static double stackShadeWeight(int slices, double density) {
-        int n = Math.max(1, slices);
-        float[] a = sliceAlphas(n);
+    /** Aporte de color de la pila, compuesto en el orden en que se emiten los cortes. */
+    private static double colorOf(double[] alphas, double scale, int slices, boolean topDown) {
+        int n = alphas.length;
         double acumulado = 0.0D;
-        for (int i = 0; i < n; i++) {
-            double vertical = n <= 1
-                    ? 0.88D
-                    : BOTTOM_SHADE + (1.0D - BOTTOM_SHADE) * sliceT(i, n);
-            double alfa = a[i] * edgeAlphaOf(density, thresholdOf(i, n));
-            acumulado = vertical * alfa + acumulado * (1.0D - alfa);
+        for (int paso = 0; paso < n; paso++) {
+            int i = topDown ? n - 1 - paso : paso;
+            double a = Math.min(MAX_SLICE_ALPHA, alphas[i] * scale);
+            acumulado = verticalOf(i, slices) * a + acumulado * (1.0D - a);
         }
         return acumulado;
     }
 
-    /**
-     * Tabla de correccion que iguala el COLOR de la pila entre niveles de detalle.
-     *
-     * <h2>Por que hace falta si la opacidad ya era constante</h2>
-     *
-     * Desde la 0.2.2 la pila converge siempre a la misma opacidad, y eso alcanzaba para que el
-     * nivel de detalle no cambiara cuanto tapa una nube. Pero no alcanza para que no cambie de que
-     * color queda: cada nivel reparte sus cortes sobre alturas distintas, y los alfas por corte
-     * tampoco son iguales -no pueden serlo, es justamente lo que mantiene constante la opacidad-,
-     * asi que la mezcla de sombreados que sale de la pila es distinta. Medido a densidad saturada,
-     * una region de ocho cortes quedaba 1,7 niveles de gris mas oscura que su vecina de cuatro.
-     *
-     * A densidad baja la diferencia es de 0,2 niveles y no se ve. Pero crece con la densidad, y por
-     * eso aparece al subir la cantidad de nubes: el cielo se llena, las densidades suben, y el
-     * limite entre dos regiones de distinto nivel -que es recto y mide 256 bloques- se vuelve un
-     * panel visible. Es exactamente el defecto que quedaba al 200% de cobertura.
-     *
-     * La condicion que hacia falta no era que dos cortes coplanares tuvieran el mismo color, que es
-     * lo que se verificaba hasta la 0.2.5: era que la COLUMNA ENTERA diera el mismo color, que es
-     * lo que el ojo compara a los dos lados de la costura.
-     *
-     * La correccion depende de la densidad porque el desajuste tambien: a densidades donde un nivel
-     * tiene cortes activos y el otro todavia no, la mezcla difiere de otra manera. Por eso es una
-     * tabla y no una constante. Se calcula una vez al cargar la clase y se consulta con una
-     * interpolacion lineal.
-     *
-     * El nivel mas fino es la referencia, asi que los demas se corrigen hacia el y lo que se ve de
-     * cerca no cambia.
-     */
-    private static float[][] buildShadeScale() {
-        float[][] tabla = new float[LADDER_STEPS + 1][];
-        for (int n = 1; n <= LADDER_STEPS; n++) {
-            tabla[n] = new float[SHADE_BUCKETS];
-            for (int b = 0; b < SHADE_BUCKETS; b++) {
-                double d = b / (double) (SHADE_BUCKETS - 1);
-                double referencia = stackShadeWeight(LADDER_STEPS, d);
-                double propio = stackShadeWeight(n, d);
-                double k = 1.0D;
-                if (propio > 1.0E-6D && referencia > 1.0E-6D) {
-                    k = referencia / propio;
-                }
-                k = Math.max(SHADE_SCALE_MIN, Math.min(SHADE_SCALE_MAX, k));
+    private static void buildLevelMatch() {
+        for (int orden = 0; orden < 2; orden++) {
+            boolean topDown = orden == 1;
+            for (int n = 1; n <= LADDER_STEPS; n++) {
+                float[] alfa = new float[MATCH_BUCKETS];
+                float[] sombra = new float[MATCH_BUCKETS];
+                for (int b = 0; b < MATCH_BUCKETS; b++) {
+                    double d = b / (double) (MATCH_BUCKETS - 1);
 
-                // Se aplica entera solo donde las dos pilas ya tapan lo mismo, y se desvanece a
-                // medida que las opacidades se separan.
-                double difOpacidad = Math.abs(stackOpacityAt(n, d) - stackOpacityAt(LADDER_STEPS, d));
-                double confianza = Math.max(0.0D, 1.0D - difOpacidad / OPACITY_TOLERANCE);
-                tabla[n][b] = (float) (1.0D + (k - 1.0D) * confianza);
+                    double[] refA = baseAlphas(LADDER_STEPS, d);
+                    double[] miA = baseAlphas(n, d);
+                    double objetivoOpacidad = opacityOf(refA, 1.0D);
+                    double objetivoColor = colorOf(refA, 1.0D, LADDER_STEPS, topDown);
+
+                    // Paso 1: igualar cuanto tapa. La opacidad crece con el factor, asi que
+                    // basta una biseccion.
+                    double k = 1.0D;
+                    if (opacityOf(miA, 1.0D) > 1.0E-9D && objetivoOpacidad > 1.0E-9D) {
+                        double bajo = 0.0D;
+                        double alto = 64.0D;
+                        for (int paso = 0; paso < 60; paso++) {
+                            double medio = 0.5D * (bajo + alto);
+                            if (opacityOf(miA, medio) < objetivoOpacidad) {
+                                bajo = medio;
+                            } else {
+                                alto = medio;
+                            }
+                        }
+                        k = 0.5D * (bajo + alto);
+                    }
+
+                    // Paso 2: con esos alfas, igualar el color.
+                    double mio = colorOf(miA, k, n, topDown);
+                    double ks = mio > 1.0E-9D && objetivoColor > 1.0E-9D ? objetivoColor / mio : 1.0D;
+
+                    alfa[b] = (float) k;
+                    sombra[b] = (float) ks;
+                }
+                ALPHA_SCALE[orden][n] = alfa;
+                SHADE_SCALE[orden][n] = sombra;
             }
         }
-        return tabla;
     }
 
-    /** La correccion para un nivel y una densidad. */
-    public static float shadeScale(int slices, double density) {
+    private static float lookup(float[][][] tabla, int slices, double density, boolean topDown) {
         int n = Math.max(1, Math.min(LADDER_STEPS, slices));
-        float[] fila = SHADE_SCALE[n];
+        float[] fila = tabla[topDown ? 1 : 0][n];
         if (fila == null) {
             return 1.0F;
         }
-        double d = Math.max(0.0D, Math.min(1.0D, density)) * (SHADE_BUCKETS - 1);
+        double d = Math.max(0.0D, Math.min(1.0D, density)) * (MATCH_BUCKETS - 1);
         int i = (int) d;
-        if (i >= SHADE_BUCKETS - 1) {
-            return fila[SHADE_BUCKETS - 1];
+        if (i >= MATCH_BUCKETS - 1) {
+            return fila[MATCH_BUCKETS - 1];
         }
         float f = (float) (d - i);
         return fila[i] * (1.0F - f) + fila[i + 1] * f;
+    }
+
+    /** Factor sobre el alfa de cada corte para que la pila tape lo mismo que el nivel mas fino. */
+    public static float alphaScale(int slices, double density, boolean topDown) {
+        return lookup(ALPHA_SCALE, slices, density, topDown);
+    }
+
+    /** Factor sobre el sombreado para que, con esos alfas, el color tambien coincida. */
+    public static float shadeScale(int slices, double density, boolean topDown) {
+        return lookup(SHADE_SCALE, slices, density, topDown);
+    }
+
+    /** Tope de alfa por corte, para que el constructor de mallas aplique el mismo recorte. */
+    public static float maxSliceAlpha() {
+        return (float) MAX_SLICE_ALPHA;
     }
 
     /** El alfa de un corte suelto. Comodidad para tests: construye la escalera entera. */
@@ -455,10 +531,15 @@ public final class DensityField {
                 ? 0.88F
                 : BOTTOM_SHADE + (1.0F - BOTTOM_SHADE) * (float) sliceT(sliceIndex, slices);
         float byDensity = 1.0F - 0.12F * (float) density;
-        // La correccion por nivel es lo que hace que la columna entera de una region de cuatro
-        // cortes quede del mismo color que la de ocho, y que la costura entre las dos deje de
-        // leerse como un panel cuando el cielo esta cargado.
-        return vertical * byDensity * shadeScale(slices, density);
+        return vertical * byDensity;
+    }
+
+    /**
+     * Sombreado con la igualacion entre niveles ya aplicada. Es el que usa el constructor de
+     * mallas; la version de tres argumentos es el sombreado crudo, sin igualar.
+     */
+    public float shade(double density, int sliceIndex, int slices, boolean topDown) {
+        return this.shade(density, sliceIndex, slices) * shadeScale(slices, density, topDown);
     }
 
     /**

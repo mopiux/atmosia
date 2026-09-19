@@ -15,11 +15,18 @@ public enum LodLevel {
 
     HIGH(8, 16, 3),
     MEDIUM(4, 16, 3),
-    LOW(2, 32, 2);
+    LOW(2, 16, 2);
 
-    // La celda no crece tanto como el ahorro tentaria: una celda de 128 bloques se ve como una
-    // sabana rectangular en el cielo, no como una nube, por lejos que este. El ahorro a distancia
-    // sale de los slices, que es donde esta el costo de relleno.
+    // El lado de celda es el MISMO en los tres niveles, a proposito.
+    //
+    // Cambiarlo entre niveles cambia la silueta de la nube -una grilla mas gruesa activa o no
+    // activa celdas donde la fina hace lo contrario- y eso es una discontinuidad de forma en el
+    // borde entre dos regiones vecinas, que ninguna correccion de color puede tapar. Con el lado
+    // igual en todos los niveles, lo unico que cambia el nivel de detalle es cuantos cortes hay, y
+    // eso si se puede igualar exactamente (ver DensityField.levelMatch).
+    //
+    // El ahorro a distancia sale de los cortes, que es donde esta el costo de relleno: pasar de
+    // ocho a dos es cuatro veces menos pixeles pintados.
     //
     // Hubo un cuarto nivel, MINIMAL, con un corte y celdas de 64 bloques. Se quito porque era
     // inalcanzable -el tramo de LOW llegaba hasta el borde del domo y no dejaba lugar para otro-

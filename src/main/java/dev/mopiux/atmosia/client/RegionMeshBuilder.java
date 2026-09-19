@@ -47,6 +47,8 @@ public final class RegionMeshBuilder {
         // modo que la capa se desvanece hacia arriba y hacia abajo en vez de terminar en un canto.
         // La escalera esta normalizada para que la pila entera siga llegando a la misma opacidad.
         float[] sliceAlphas = DensityField.sliceAlphas(slices);
+        boolean topDown = job.topDown();
+        float maxSliceAlpha = DensityField.maxSliceAlpha();
 
         BufferBuilder builder = new BufferBuilder(Math.max(256, result.estimatedQuads() * 4 * 16));
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
@@ -92,10 +94,14 @@ public final class RegionMeshBuilder {
                     float x1 = x0 + cellSize;
                     float z1 = z0 + cellSize;
 
-                    emit(builder, layer, field, x0, y, z0, d00, a00 * sliceAlpha, slice, slices);
-                    emit(builder, layer, field, x0, y, z1, d01, a01 * sliceAlpha, slice, slices);
-                    emit(builder, layer, field, x1, y, z1, d11, a11 * sliceAlpha, slice, slices);
-                    emit(builder, layer, field, x1, y, z0, d10, a10 * sliceAlpha, slice, slices);
+                    emit(builder, layer, field, x0, y, z0, d00, a00, sliceAlpha, maxSliceAlpha,
+                            slice, slices, topDown);
+                    emit(builder, layer, field, x0, y, z1, d01, a01, sliceAlpha, maxSliceAlpha,
+                            slice, slices, topDown);
+                    emit(builder, layer, field, x1, y, z1, d11, a11, sliceAlpha, maxSliceAlpha,
+                            slice, slices, topDown);
+                    emit(builder, layer, field, x1, y, z0, d10, a10, sliceAlpha, maxSliceAlpha,
+                            slice, slices, topDown);
                     quads++;
                 }
             }
@@ -122,9 +128,16 @@ public final class RegionMeshBuilder {
      * cuadrilatero queda de un color plano y la grilla se ve aunque el alfa se interpole.
      */
     private static void emit(BufferBuilder builder, CloudLayerDef layer, DensityField field,
-                             float x, float y, float z, float density, float alpha,
-                             int slice, int slices) {
-        float shade = field.shade(density, slice, slices);
+                             float x, float y, float z, float density, float edgeAlpha,
+                             float sliceAlpha, float maxSliceAlpha,
+                             int slice, int slices, boolean topDown) {
+        // Los dos factores de igualacion entre niveles: uno sobre el alfa, para que la pila tape
+        // lo mismo que la del nivel mas fino, y otro sobre el color, para que ademas quede del
+        // mismo color. Sin los dos, el limite entre dos regiones de distinto nivel se ve como una
+        // recta de 256 bloques.
+        float alpha = Math.min(maxSliceAlpha,
+                edgeAlpha * sliceAlpha * DensityField.alphaScale(slices, density, topDown));
+        float shade = field.shade(density, slice, slices, topDown);
         builder.vertex(x, y, z)
                 .color(layer.red() * shade, layer.green() * shade, layer.blue() * shade, alpha)
                 .endVertex();

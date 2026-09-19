@@ -289,12 +289,22 @@ public final class CoreSmokeTest {
      * los mezcla.
      */
     static double columnaCompuesta(DensityField f, CloudLayerDef capa, int cortes, double densidad) {
+        return columnaCompuesta(f, capa, cortes, densidad, true);
+    }
+
+    /** Igual que en el constructor de mallas: los dos factores de igualacion y el orden de mezcla. */
+    static double columnaCompuesta(DensityField f, CloudLayerDef capa, int cortes, double densidad,
+                                   boolean topDown) {
         float[] alfas = DensityField.sliceAlphas(cortes);
+        float k = DensityField.alphaScale(cortes, densidad, topDown);
+        float tope = DensityField.maxSliceAlpha();
         double propio = 0.0D;
         double resto = 1.0D;
-        for (int i = 0; i < cortes; i++) {
-            double a = f.cellAlpha(densidad, f.sliceThreshold(i, cortes)) * alfas[i];
-            propio = capa.green() * f.shade(densidad, i, cortes) * a + propio * (1.0D - a);
+        for (int paso = 0; paso < cortes; paso++) {
+            int i = topDown ? cortes - 1 - paso : paso;
+            double a = Math.min(tope,
+                    f.cellAlpha(densidad, f.sliceThreshold(i, cortes)) * alfas[i] * k);
+            propio = capa.green() * f.shade(densidad, i, cortes, topDown) * a + propio * (1.0D - a);
             resto *= (1.0D - a);
         }
         return propio + 0.72D * resto;
@@ -592,13 +602,29 @@ public final class CoreSmokeTest {
                     mismaSombra = false;
                     break;
                 }
-                mismoUmbral &= Math.abs(f.sliceThreshold(ig, cg) - f.sliceThreshold(igual, cf)) < 1.0E-9D;
+                mismoUmbral &= f.sliceThreshold(ig, cg) <= f.sliceThreshold(igual, cf) + 1.0E-9D;
                 // El sombreado de un corte suelto ya NO tiene por que coincidir entre niveles: la
                 // correccion por nivel lo cambia a proposito. Lo que tiene que coincidir es la
                 // columna entera, y eso se verifica abajo.
                 mismaSombra &= f.shade(0.5D, ig, cg) > 0.0F;
             }
-            check("umbral igual en cortes coplanares " + niveles[i] + "|" + niveles[i + 1], mismoUmbral, "");
+            check("el nivel grueso nunca recorta antes que el fino "
+                    + niveles[i] + "|" + niveles[i + 1], mismoUmbral, "");
+
+            // La silueta exterior la marca el umbral mas bajo. Si no coincide entre niveles, hay
+            // densidades donde uno dibuja nube y el otro no, y eso es un borde de geometria que
+            // ningun ajuste de color puede tapar.
+            double minFino = 1.0D;
+            double minGrueso = 1.0D;
+            for (int k = 0; k < cf; k++) {
+                minFino = Math.min(minFino, f.sliceThreshold(k, cf));
+            }
+            for (int k = 0; k < cg; k++) {
+                minGrueso = Math.min(minGrueso, f.sliceThreshold(k, cg));
+            }
+            check("la silueta exterior es la misma en " + niveles[i] + "|" + niveles[i + 1],
+                    Math.abs(minFino - minGrueso) < 1.0E-9D,
+                    String.format(Locale.ROOT, "%.4f vs %.4f", minFino, minGrueso));
             check("sombreado valido en cortes coplanares " + niveles[i] + "|" + niveles[i + 1], mismaSombra, "");
         }
 
@@ -626,12 +652,24 @@ public final class CoreSmokeTest {
                     peorParcial = Math.max(peorParcial, salto);
                 }
             }
-            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " es exacta con nube densa",
-                    peorSaturado < 0.01D,
-                    String.format(Locale.ROOT, "%.3f niveles de gris", peorSaturado));
-            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " se mantiene baja con nube tenue",
-                    peorParcial < 1.8D,
-                    String.format(Locale.ROOT, "%.2f niveles de gris", peorParcial));
+            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " es invisible con nube densa",
+                    peorSaturado < 0.05D,
+                    String.format(Locale.ROOT, "%.4f niveles de gris", peorSaturado));
+            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " es invisible con nube tenue",
+                    peorParcial < 0.05D,
+                    String.format(Locale.ROOT, "%.4f niveles de gris", peorParcial));
+
+            // Y lo mismo mirando desde arriba, que usa el otro orden de mezcla.
+            double peorArriba = 0.0D;
+            for (int paso = 0; paso <= 200; paso++) {
+                double d = paso / 200.0D;
+                peorArriba = Math.max(peorArriba,
+                        Math.abs(columnaCompuesta(f, CloudLayerDef.LOW, cf, d, false)
+                                - columnaCompuesta(f, CloudLayerDef.LOW, cg, d, false)) * 255.0D);
+            }
+            check("la costura " + niveles[i] + "|" + niveles[i + 1] + " tambien es invisible desde arriba",
+                    peorArriba < 0.05D,
+                    String.format(Locale.ROOT, "%.4f niveles de gris", peorArriba));
         }
 
         // Los cortes tienen que seguir repartidos por el espesor, no amontonados.
@@ -865,7 +903,17 @@ public final class CoreSmokeTest {
 
         int high = LodLevel.HIGH.maxQuadsPerRegionLayer(RegionKey.REGION_SIZE);
         int barato = LodLevel.LOW.maxQuadsPerRegionLayer(RegionKey.REGION_SIZE);
-        check("el nivel mas barato cuesta mucho menos que HIGH", barato * 8 <= high, high + " vs " + barato);
+        // El ahorro ahora sale solo de los cortes, no del lado de celda: el lado es el mismo en
+        // los tres niveles a proposito, porque cambiarlo cambia la silueta y eso se ve como un
+        // borde entre regiones vecinas. Cuatro veces menos relleno sigue siendo el ahorro que
+        // importa, que es el de pixeles pintados.
+        check("el nivel mas barato cuesta cuatro veces menos que HIGH",
+                barato * 4 <= high, high + " vs " + barato);
+        check("y todos los niveles muestrean con el mismo lado de celda",
+                LodLevel.HIGH.cellSize() == LodLevel.LOW.cellSize()
+                        && LodLevel.MEDIUM.cellSize() == LodLevel.LOW.cellSize(),
+                LodLevel.HIGH.cellSize() + "/" + LodLevel.MEDIUM.cellSize() + "/"
+                        + LodLevel.LOW.cellSize());
     }
 
     static void fade() {

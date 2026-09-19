@@ -99,18 +99,38 @@ public final class LodSelector {
         return level.ordinal() < this.detailCap.ordinal() ? this.detailCap : level;
     }
 
+    /** Donde empieza a desvanecerse el borde del domo, como fraccion del alcance. */
+    private static final double FADE_START = 0.60D;
+
     /**
      * Atenuacion por distancia en [0,1], para que el borde del mundo de nubes no aparezca como un
-     * corte recto. Empieza a desvanecer en el ultimo 15% del rango.
+     * corte recto.
+     *
+     * <h2>Por que la banda es ancha</h2>
+     *
+     * Esta atenuacion se aplica una vez por region, porque cada region es un draw call y su
+     * opacidad se pasa como un uniforme. Una region mide 256 bloques, asi que si la banda de
+     * desvanecimiento es mas angosta que eso, dos regiones vecinas pueden quedar una entera
+     * visible y la otra entera invisible: un borde recto de 256 bloques y, al moverse el jugador,
+     * un parpadeo.
+     *
+     * Con el 40% del alcance la banda mide varias regiones -307 bloques con un domo de 768- y el
+     * salto entre vecinas baja a una fraccion. Es la unica discontinuidad por region que queda en
+     * el sistema, y la unica que no se puede llevar a cero sin dibujar cada corte por separado.
+     *
+     * El suavizado hermite ademas anula la derivada en los dos extremos, asi que ni el arranque ni
+     * el final de la banda se notan como un quiebre.
      */
     public float distanceFade(double distance) {
-        double fadeStart = this.maxDistance * 0.85D;
+        double fadeStart = this.maxDistance * FADE_START;
         if (distance <= fadeStart) {
             return 1.0F;
         }
         if (distance >= this.maxDistance) {
             return 0.0F;
         }
-        return (float) (1.0D - (distance - fadeStart) / (this.maxDistance - fadeStart));
+        double t = (distance - fadeStart) / (this.maxDistance - fadeStart);
+        double suave = t * t * (3.0D - 2.0D * t);
+        return (float) (1.0D - suave);
     }
 }

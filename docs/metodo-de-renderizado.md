@@ -1,6 +1,6 @@
 # El método: cómo se cargan y se dibujan las nubes
 
-*Descripción técnica del sistema tal como está en la versión 0.2.7. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
+*Descripción técnica del sistema tal como está en la versión 0.3.0. Solo el método: qué hace cada pieza, en qué orden y con qué números.*
 
 ---
 
@@ -369,11 +369,32 @@ Al final del frame, si la caché superó su tamaño máximo, se ordena por frame
 
 En esta arquitectura el LOD no es "menos vértices de la misma forma". Es **menos cortes verticales y celdas más grandes**.
 
-| Nivel | Cortes por capa | Lado de celda | Capas dibujadas | Celdas por región | Tope de cuádruples por región |
+| Nivel | Cortes por capa | Lado de celda | Capas dibujadas | Celdas por región | Cuádruples reales (cobertura 100 %) |
 |---|---|---|---|---|---|
-| **Alto** | 8 | 16 bloques | 3 | 16 × 16 = 256 | 2.048 |
-| **Medio** | 4 | 16 bloques | 3 | 16 × 16 = 256 | 1.024 |
-| **Bajo** | 2 | 32 bloques | 2 | 8 × 8 = 64 | 128 |
+| **Alto** | 8 | 16 bloques | 3 | 16 × 16 = 256 | 264 |
+| **Medio** | 4 | 16 bloques | 3 | 16 × 16 = 256 | 159 |
+| **Bajo** | 2 | 16 bloques | 2 | 16 × 16 = 256 | 109 |
+
+**El lado de celda es el mismo en los tres niveles, a propósito.** Cambiarlo cambia la silueta de la nube —una grilla más gruesa activa o no activa celdas donde la fina hace lo contrario— y eso es una discontinuidad de forma justo en el límite entre dos regiones vecinas, que ninguna corrección de color puede tapar. El ahorro a distancia sale de los cortes, que es donde está el costo de píxeles pintados.
+
+### 5.1 El nivel de detalle no cambia nada de lo que se ve
+
+El límite entre dos regiones de distinto nivel es una recta de 256 bloques. Cualquier diferencia entre los dos lados se lee como una línea, **por chica que sea**: medido sobre capturas del juego, una diferencia de uno o dos niveles de gris ya se ve como una grilla, porque el ojo detecta rectas largas de bajo contraste mucho mejor que manchas del mismo contraste.
+
+Así que no alcanza con reducirla. Tiene que ser cero. Hacen falta tres cosas, y las tres:
+
+1. **Misma silueta.** Cada corte de un nivel grueso toma el umbral más bajo del tramo de la escalera fina que reemplaza, de modo que el umbral mínimo —el que marca dónde hay nube y dónde no— es idéntico en los tres niveles.
+2. **Misma opacidad.** Un factor sobre los alfas, resuelto por bisección, lleva la pila gruesa a tapar exactamente lo mismo que la fina.
+3. **Mismo color.** Con esos alfas ya corregidos, un segundo factor sobre el sombreado iguala el color compuesto.
+
+Los dos factores están tabulados por nivel, por densidad y por orden de mezcla, y se calculan una vez al cargar la clase.
+
+| Costura | Nube densa | Nube tenue | Desde arriba |
+|---|---|---|---|
+| Alto \| Medio | 0,0000 | 0,0007 | 0,0020 |
+| Medio \| Bajo | 0,0000 | 0,0018 | 0,0015 |
+
+En niveles de gris. Una pantalla de 8 bits no puede representar menos de 1.
 
 Los cortes son lo que da la profundidad volumétrica y lo que cuesta relleno de píxeles, así que reducirlos a distancia es exactamente donde está el ahorro. **La celda no crece tanto como el ahorro tentaría**: una celda muy grande se lee como una sábana rectangular en el cielo por lejos que esté, y eso es un defecto visual, no un ajuste de calidad.
 
